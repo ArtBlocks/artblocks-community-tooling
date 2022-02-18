@@ -9,3 +9,5 @@ Each tool's directory should have:
 
 ## Contributing
 Anyone from the Art Blocks community is encouraged to participate in the improvement of this repository. Please submit PRs or reach out to developers on Discord if you have any questions.
+
+A special thank you to [@xenoliss](https://github.com/xenoliss) for their work implementing the initial versions of the `ArtistAssistant` and `RoyaltiesProcessorDelivery` scripts, not captured by the git history here in this repo.
