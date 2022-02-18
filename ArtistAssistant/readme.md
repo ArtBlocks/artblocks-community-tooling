@@ -87,9 +87,3 @@ Until properly handled, these assumptions may result in incorrect royalty estima
 # Dependencies
 
 The scripts in this project depend on Art Blocks public hosted subgraph. This can be found at https://thegraph.com/hosted-service/subgraph/artblocks/art-blocks.
-
-# Contributions
-
-Contributions to this tool by community members are more than welcome via PRs! 
-
-A special thank you to [@xenoliss](https://github.com/xenoliss) for their work on the initial version of this script, not captured by the git history.
