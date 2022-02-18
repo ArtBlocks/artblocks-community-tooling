@@ -5,8 +5,8 @@
   "scripts": {
     "start": "./node_modules/.bin/ts-node src/index.ts"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Art Blocks, Inc.",
+  "license": "MIT",
   "description": "",
   "devDependencies": {
     "@types/node": "^16.0.0",
