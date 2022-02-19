@@ -1,6 +1,8 @@
 # Art Blocks Community Tooling
 A collection of open source tools, built in collaboration with the Art Blocks community!
 
+> :warning: This is a community tool set with contributions from external community members. Please use caution and know that you should NEVER enter private keys, seed phrases, or any other sensitive information when using these tools.
+
 ## Organization
 Each tool is in its own directory. Some tools are written in Python, others in node, and future tools may use other languages. 
 
