@@ -24,16 +24,16 @@ type T_OpenSeaSaleLookupTable = {
 }
 
 export type T_OpenSeaSale = {
-  id: string;
-  saleType: "Single" | "Bundle";
-  blockNumber: number;
-  blockTimestamp: string;
-  summarayTokenSold: string;
-  seller: string;
-  buyer: string;
-  paymentToken: string;
-  price: string;
-  isPrivate: boolean;
-  summaryTokensSold;: string;
-  openSeaSaleLookupTables: T_OpenSeaSaleLookupTable[];
+    id: string;
+    saleType: "Single" | "Bundle";
+    blockNumber: number;
+    blockTimestamp: string;
+    summarayTokenSold: string;
+    seller: string;
+    buyer: string;
+    paymentToken: string;
+    price: string;
+    isPrivate: boolean;
+    summaryTokensSold: string;
+    openSeaSaleLookupTables: T_OpenSeaSaleLookupTable[];
 };
