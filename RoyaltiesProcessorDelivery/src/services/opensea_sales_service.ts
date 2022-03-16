@@ -1,7 +1,6 @@
 import { BigNumber } from "ethers";
 import {
   BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES,
-  AB_FLAGSHIP_CONTRACTS,
 } from "../constant";
 
 import { OpenseaSalesRepository } from "../repositories/opensea_sales_repository";
@@ -33,7 +32,7 @@ export class OpenSeaSalesService {
     while (true) {
       console.log(
         `Fetching last ${first} sales from subgraph for block range: ` +
-          `[${blockNumberGte}; ${blockNumberLt}[`
+        `[${blockNumberGte}; ${blockNumberLt}[`
       );
       const newSales =
         await this.#openSeaSaleRepository.getSalesBetweenBlockNumbers(
@@ -87,51 +86,24 @@ export class OpenSeaSalesService {
 
   generateProjectReports(
     openSeaSales: T_OpenSeaSale[],
-    curationStatus?: string,
-    flagship?: boolean,
-    contract?: string | undefined
   ): Map<string, ProjectReport> {
     const projectReports = new Map<string, ProjectReport>();
 
     // Browse all sales
-    let additionalSalesFoundInBundledSales = 0;
-    let skippedNonFlagshipTokens = 0;
-    let skippedOtherContractTokens = 0;
-    let skippedCurationStatus = 0;
     for (const openSeaSale of openSeaSales) {
       const openSeaSaleLookupTables = openSeaSale.openSeaSaleLookupTables;
+
+      // In the pre-filtering stage we might have removed some so we can't
+      // get the  number from the openSeaSaleLookupTables list length
+      const nbTokensSold = openSeaSale.summaryTokensSold.split("::").length;
 
       // Browse the list of tokens sold in this sale
       // May be only one in the case of a "Single" sale
       // May be several in the case of a "Bundle" sale
       // In the case of "Bundle" sale only AB tokens are registered by the AB subgraph
-      let _bundleIndex = 0;
       for (const tokenOpenSeaSaleLookupTable of openSeaSaleLookupTables) {
-        _bundleIndex++;
-        if (_bundleIndex > 1) {
-          additionalSalesFoundInBundledSales++;
-        }
         const token = tokenOpenSeaSaleLookupTable.token;
         const project = token.project;
-
-        // filter: curation status
-        if (
-          curationStatus !== undefined &&
-          project.curationStatus !== curationStatus
-        ) {
-          skippedCurationStatus++;
-          continue;
-        }
-        // filter: flagship
-        if (flagship && !AB_FLAGSHIP_CONTRACTS.includes(token.contract.id)) {
-          skippedNonFlagshipTokens++;
-          continue;
-        }
-        // filter: contract
-        if (contract && contract != token.contract.id) {
-          skippedOtherContractTokens++;
-          continue;
-        }
 
         // Get/Instanciate the projectReport
         let projectReport = projectReports.get(project.name);
@@ -152,46 +124,12 @@ export class OpenSeaSalesService {
         //!       NFTs sold in the bundle)
         //!       But this edges case is extremely rare
         //!       (This is noted as an assumption in readme)
-        const priceAttributedToProject = BigNumber.from(openSeaSale.price).div(
-          openSeaSaleLookupTables.length
-        );
+        const priceAttributedToProject = BigNumber.from(openSeaSale.price).div(nbTokensSold);
         const paymentToken = openSeaSale.paymentToken;
 
         projectReport.addSale(paymentToken, priceAttributedToProject);
         projectReports.set(project.name, projectReport);
       }
-    }
-    // report any additional tokens found
-    if (additionalSalesFoundInBundledSales) {
-      console.info(
-        `[INFO] Found ${additionalSalesFoundInBundledSales} ` +
-          `additional individual token sales while un-bundling bundled sales`
-      );
-    }
-
-    // report any non-flagship tokens skipped
-    if (skippedNonFlagshipTokens) {
-      console.info(
-        `[INFO] Skipped ${skippedNonFlagshipTokens} ` +
-          `tokens related to non-flagship products`
-      );
-    }
-
-    // report any different contract tokens skipped
-    if (skippedOtherContractTokens) {
-      console.info(
-        `[INFO] Skipped ${skippedOtherContractTokens} ` +
-          `tokens on contracts other than ${contract}`
-      );
-    }
-
-    // report any incorrect curation status tokens skipped
-    // (will only happen if in mixed bundles)
-    if (skippedCurationStatus) {
-      console.info(
-        `[INFO] Skipped ${skippedCurationStatus} ` +
-          `tokens not in collection ${curationStatus}`
-      );
     }
 
     // Once all sales have been processed
