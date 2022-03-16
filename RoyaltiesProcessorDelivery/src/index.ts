@@ -95,8 +95,8 @@ async function processSales(
 
   console.info(
     `[INFO] ${openSeaSales.length} OpenSea sales remaining after filtering ` +
-      `private sales without royalties (prior to block ` +
-      `${BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES})`
+    `private sales without royalties (prior to block ` +
+    `${BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES})`
   );
 
   // if nothing found, alert and return
@@ -151,7 +151,7 @@ yargs(hideBin(process.argv))
       yargs
         .positional("startingBlock", {
           description:
-            "Only the sales between the given block numbers ([startingBlock; endingBlock[) will be processed. If -1 is passed for startingBlock, it will run from the previous stored block.",
+            "Only the sales between the given block numbers ([startingBlock; endingBlock[) will be processed.",
           type: "number",
         })
         .option("endingBlock", {
