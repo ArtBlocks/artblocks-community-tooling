@@ -28,7 +28,6 @@ export type T_OpenSeaSale = {
     saleType: "Single" | "Bundle";
     blockNumber: number;
     blockTimestamp: string;
-    summarayTokenSold: string;
     seller: string;
     buyer: string;
     paymentToken: string;
