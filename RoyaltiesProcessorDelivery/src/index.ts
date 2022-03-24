@@ -93,13 +93,15 @@ async function processSales(
       }
 
       const openSeaFilterPass = openSeaFilter === undefined || openSeaSale.openSeaVersion === openSeaFilter;
+      console.log(openSeaFilter);
+      console.log(openSeaSale.openSeaVersion);
       if (openSeaFilterPass === false) {
         skippedOpenSeaVersion += 1;
         return false;
       }
 
       const token = openSeaSaleLookupTable.token;
-      const curationFilterPass = collectionFilter === undefined || token.project.curationStatus !== collectionFilter;
+      const curationFilterPass = collectionFilter === undefined || token.project.curationStatus === collectionFilter;
       if (curationFilterPass === false) {
         skippedCurationStatus += 1;
         return false;
@@ -225,7 +227,7 @@ yargs(hideBin(process.argv))
             "Only the sales between the given block numbers ([startingBlock; endingBlock[) will be processed. If no endingBlock is provided it will run up to the current block number",
           type: "number",
         })
-        .option("os-version", {
+        .option("osVersion", {
           description: "A filter to only process sales of OpenSea V1 or OpenSea V2",
           type: "string",
           choices: ["V1", "V2"],
@@ -272,7 +274,7 @@ yargs(hideBin(process.argv))
       let writeToCsv = argv.csv !== undefined;
       let outputPath = argv.outputPath as string | undefined;
 
-      const openSeaVersion = argv.collection as OpenSeaVersion | undefined;
+      const openSeaVersion = argv.osVersion as OpenSeaVersion | undefined;
       let salesFilter: SalesFilter = {
         openSeaFilter: openSeaVersion,
       }
