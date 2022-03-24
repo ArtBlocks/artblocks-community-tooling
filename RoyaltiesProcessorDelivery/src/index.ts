@@ -21,8 +21,10 @@ const openSeaSalesRepository = new OpenseaSalesRepository(graphQLDatasource);
 const openSeaSaleService = new OpenSeaSalesService(openSeaSalesRepository);
 
 type Collection = "curated" | "playground" | "factory";
+type OpenSeaVersion = "V1" | "V2";
 
-type OpenSeaSalesFilter = {
+type SalesFilter = {
+  openSeaFilter?: OpenSeaVersion,
   collectionFilter?: Collection,
   contractFilterType?: "ONLY" | "ONLY_NOT"
   contractsFilter?: string[]
@@ -55,7 +57,7 @@ async function getCurrentBlockNumber() {
  */
 async function processSales(
   blockRange: [number, number],
-  openseaSalesFilter: OpenSeaSalesFilter,
+  salesFilter: SalesFilter,
   csvOutputFilePath?: string,
 ) {
   let openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbers(
@@ -64,13 +66,15 @@ async function processSales(
 
   console.info(`[INFO] ${openSeaSales.length} OpenSea sales have been fetched`);
 
-  const collectionFilter = openseaSalesFilter.collectionFilter;
-  const contractFilterType = openseaSalesFilter.contractFilterType;
-  const contractsFilter = openseaSalesFilter.contractsFilter;
+  const openSeaFilter = salesFilter.openSeaFilter;
+  const collectionFilter = salesFilter.collectionFilter;
+  const contractFilterType = salesFilter.contractFilterType;
+  const contractsFilter = salesFilter.contractsFilter;
 
   let additionalSalesFoundInBundledSales = 0;
   let skippedOtherContractsTokens = 0;
   let skippedCurationStatus = 0;
+  let skippedOpenSeaVersion = 0;
 
   // Among all sales, filter those we are interested in.
   // Filter the OpenSeaSales that match the given OpenSeaSalesFilter
@@ -88,21 +92,30 @@ async function processSales(
         additionalSalesFoundInBundledSales += 1;
       }
 
+      const openSeaFilterPass = openSeaFilter === undefined || openSeaSale.openSeaVersion === openSeaFilter;
+      if (openSeaFilterPass === false) {
+        skippedOpenSeaVersion += 1;
+        return false;
+      }
+
       const token = openSeaSaleLookupTable.token;
-      const curationFilterPass = collectionFilter == undefined || token.project.curationStatus !== collectionFilter;
+      const curationFilterPass = collectionFilter === undefined || token.project.curationStatus !== collectionFilter;
+      if (curationFilterPass === false) {
+        skippedCurationStatus += 1;
+        return false;
+      }
 
       const contractsFilterPass =
         contractFilterType === undefined
         || ((contractFilterType == "ONLY" && contractsFilter!.includes(token.contract.id)) ||
           (contractFilterType == "ONLY_NOT" && !contractsFilter!.includes(token.contract.id)));
 
-      if (curationFilterPass === false) {
-        skippedCurationStatus += 1;
-      } else if (contractsFilterPass === false) {
+      if (contractsFilterPass === false) {
         skippedOtherContractsTokens += 1;
+        return false;
       }
 
-      return curationFilterPass && contractsFilterPass;;
+      return true;
     });
 
     // WARNING: Replace the openSeaSaleLookupTables by the filteredOpenSeaSaleLookupTables
@@ -115,6 +128,14 @@ async function processSales(
     console.info(
       `[INFO] Found ${additionalSalesFoundInBundledSales} ` +
       `additional individual token sales while un-bundling bundled sales`
+    );
+  }
+
+  // report OpenSea status tokens skipped
+  if (skippedOpenSeaVersion) {
+    console.info(
+      `[INFO] Skipped ${skippedOpenSeaVersion} ` +
+      `tokens not in OpenSea ${openSeaFilter}`
     );
   }
 
@@ -204,6 +225,11 @@ yargs(hideBin(process.argv))
             "Only the sales between the given block numbers ([startingBlock; endingBlock[) will be processed. If no endingBlock is provided it will run up to the current block number",
           type: "number",
         })
+        .option("os-version", {
+          description: "A filter to only process sales of OpenSea V1 or OpenSea V2",
+          type: "string",
+          choices: ["V1", "V2"],
+        })
         .option("collection", {
           description: "A filter to only process sales of the given collection",
           type: "string",
@@ -246,10 +272,13 @@ yargs(hideBin(process.argv))
       let writeToCsv = argv.csv !== undefined;
       let outputPath = argv.outputPath as string | undefined;
 
-      const collection = argv.collection as Collection | undefined;
-      let openSeaSalesFilter: OpenSeaSalesFilter = {
-        collectionFilter: collection,
+      const openSeaVersion = argv.collection as OpenSeaVersion | undefined;
+      let salesFilter: SalesFilter = {
+        openSeaFilter: openSeaVersion,
       }
+
+      const collection = argv.collection as Collection | undefined;
+      salesFilter.collectionFilter = collection;
 
       // Those 3 optional params are conflicting with each others, only one
       // can be specified at a time
@@ -258,15 +287,15 @@ yargs(hideBin(process.argv))
       let contract = argv.contract as string | undefined;
 
       if (flagship) {
-        openSeaSalesFilter.contractFilterType = "ONLY"
-        openSeaSalesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS
+        salesFilter.contractFilterType = "ONLY"
+        salesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS
       } else if (pbab) {
-        openSeaSalesFilter.contractFilterType = "ONLY_NOT"
-        openSeaSalesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS
+        salesFilter.contractFilterType = "ONLY_NOT"
+        salesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS
       } else if (contract) {
         contract = contract.toLowerCase();
-        openSeaSalesFilter.contractFilterType = "ONLY"
-        openSeaSalesFilter.contractsFilter = [contract]
+        salesFilter.contractFilterType = "ONLY"
+        salesFilter.contractsFilter = [contract]
       }
 
       // ensure ending block < currentBlock via etherscan api
@@ -295,7 +324,7 @@ yargs(hideBin(process.argv))
       }
       await processSales(
         [startingBlock, endingBlock],
-        openSeaSalesFilter,
+        salesFilter,
         outputPath,
       );
     }

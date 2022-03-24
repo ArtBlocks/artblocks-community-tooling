@@ -1,7 +1,6 @@
 import { BigNumber } from "ethers";
-import { BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES } from "../constant";
-import { addressToPaymentToken, ETH_ADDR, WETH_ADDR } from "../utils/token_conversion";
-import { T_OpenSeaSale } from "./graphQL_entities_def";
+import { addressToPaymentToken } from "../utils/token_conversion";
+
 
 export type CryptoRepartition = {
     toArtist: BigNumber,
