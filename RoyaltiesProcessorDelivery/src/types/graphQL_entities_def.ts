@@ -25,6 +25,7 @@ type T_OpenSeaSaleLookupTable = {
 
 export type T_OpenSeaSale = {
     id: string;
+    openSeaVersion: "V1" | "V2";
     saleType: "Single" | "Bundle";
     blockNumber: number;
     blockTimestamp: string;

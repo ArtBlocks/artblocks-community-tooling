@@ -215,9 +215,7 @@ export class ReportService {
     } = projectReport;
     const escapedProjectName = name.replace(sep, "");
 
-    let projectReportData = `${escapedProjectName}${sep}${totalSales}${sep}${artistAddress}${sep}${
-      additionalPayeeAddress === undefined ? "None" : additionalPayeeAddress
-    }`;
+    let projectReportData = `${escapedProjectName}${sep}${totalSales}${sep}${artistAddress}${sep}${additionalPayeeAddress === undefined ? "None" : additionalPayeeAddress}`;
 
     // Loop for all possible payment token listed by Art Blocks
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
