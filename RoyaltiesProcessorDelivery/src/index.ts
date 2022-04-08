@@ -89,7 +89,7 @@ async function processSales(
       }
 
       const token = openSeaSaleLookupTable.token;
-      const curationFilterPass = collectionFilter == undefined || token.project.curationStatus !== collectionFilter;
+      const curationFilterPass = collectionFilter == undefined || token.project.curationStatus === collectionFilter;
 
       const contractsFilterPass =
         contractFilterType === undefined
