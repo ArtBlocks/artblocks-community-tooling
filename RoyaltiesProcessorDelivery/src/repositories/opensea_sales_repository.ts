@@ -7,6 +7,7 @@ const QUERY_GET_OPENSEA_SALES = gql`
 query getOpenSeaSales($first: Int!, $skip: Int!) {
   openSeaSales(first: $first, skip: $skip, where: {WHERE_CLAUSE}, orderBy: blockNumber, orderDirection: desc) {
     id
+    saleVersion
     saleType
     price
     paymentToken
