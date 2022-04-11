@@ -48,8 +48,8 @@ export class ReportService {
     const cryptos = Array.from(cryptoDue.keys()).sort();
 
     for (const crypto of cryptos) {
-      const amount = paymentTokenVolumes.get(crypto)!;
-      const amountReadable = amountHumanReadable(crypto, amount);
+      const volume = paymentTokenVolumes.get(crypto)!;
+      const amountReadable = amountHumanReadable(crypto, volume.total);
 
       as_str += `\t\t- ${crypto}\n`;
       as_str += `\t\t\t- Total amount ${amountReadable} ${crypto}\n`;
@@ -188,7 +188,7 @@ export class ReportService {
     // Build the global CSV header
     let projectReportHeader = `PROJECT NAME${sep}TOTAL SALES${sep}ARTIST ADDRESS${sep}ADDITIONAL ADDRESS`;
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
-      projectReportHeader += `${sep}${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`;
+      projectReportHeader += `${sep}V1 ${crypto} VOLUME${sep}V2 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`;
     }
 
     let csvData = blocksHeader + projectReportHeader + "\n";
@@ -215,28 +215,34 @@ export class ReportService {
     } = projectReport;
     const escapedProjectName = name.replace(sep, "");
 
-    let projectReportData = `${escapedProjectName}${sep}${totalSales}${sep}${artistAddress}${sep}${
-      additionalPayeeAddress === undefined ? "None" : additionalPayeeAddress
-    }`;
+    let projectReportData = `${escapedProjectName}${sep}${totalSales}${sep}${artistAddress}${sep}${additionalPayeeAddress === undefined ? "None" : additionalPayeeAddress
+      }`;
 
     // Loop for all possible payment token listed by Art Blocks
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
-      // If no sales was made with this payment token, still record it with a 0
-      const amount = paymentTokenVolumes.get(crypto) || 0;
-      let amountReadable = "0.000";
-      let amountToArtistReadable = "0.000";
-      let amountToAdditionalPayeeReadable = "0.000";
+      const volume = paymentTokenVolumes.get(crypto);
 
-      if (amount !== 0) {
+      // If no sales was made with this payment token, record it with a 0
+      let v1VolumeReadable = "0.00000";
+      let v2VolumeReadable = "0.00000";
+      let totalVolumeReadable = "0.00000";
+      let amountToArtistReadable = "0.00000";
+      let amountToAdditionalPayeeReadable = "0.00000";
+
+      // Else fetch the amounts
+      if (volume !== undefined) {
         const { toArtist, toAdditional } = cryptoDue.get(crypto)!;
-        amountReadable = amountHumanReadable(crypto, amount);
+        v1VolumeReadable = amountHumanReadable(crypto, volume["V1"]);
+        v2VolumeReadable = amountHumanReadable(crypto, volume["V2"]);
+        totalVolumeReadable = amountHumanReadable(crypto, volume.total);
         amountToArtistReadable = amountHumanReadable(crypto, toArtist);
         amountToAdditionalPayeeReadable =
           toAdditional !== 0
             ? amountHumanReadable(crypto, toAdditional)
-            : "0.000";
+            : "0.00000";
       }
-      projectReportData += `${sep}${amountReadable}${sep}${amountToArtistReadable}${sep}${amountToAdditionalPayeeReadable}`;
+
+      projectReportData += `${sep}${v1VolumeReadable}${sep}${v2VolumeReadable}${sep}${totalVolumeReadable}${sep}${amountToArtistReadable}${sep}${amountToAdditionalPayeeReadable}`;
     }
 
     return projectReportData + "\n";

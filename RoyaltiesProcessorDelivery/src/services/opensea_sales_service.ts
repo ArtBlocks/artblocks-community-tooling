@@ -117,17 +117,7 @@ export class OpenSeaSalesService {
           );
         }
 
-        // Add the sale to the report
-        // The price is divided between the number of tokens in the sale
-        // TODO!: The subgraph only register AB tokens in for Bundle. If the bundle contains other NFTs
-        //!       the price will not be split correctly (i.e only split in 2 whereas there are 5
-        //!       NFTs sold in the bundle)
-        //!       But this edges case is extremely rare
-        //!       (This is noted as an assumption in readme)
-        const priceAttributedToProject = BigNumber.from(openSeaSale.price).div(nbTokensSold);
-        const paymentToken = openSeaSale.paymentToken;
-
-        projectReport.addSale(paymentToken, priceAttributedToProject);
+        projectReport.addSale(openSeaSale, nbTokensSold);
         projectReports.set(project.name, projectReport);
       }
     }
