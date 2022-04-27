@@ -14,18 +14,23 @@ import { ReportService } from "./services/report_service";
 import { OpenSeaSalesService } from "./services/opensea_sales_service";
 import { T_OpenSeaSale } from "./types/graphQL_entities_def";
 import { exit } from "process";
+import { TokenZeroRepository } from "./repositories/token_zero_repository";
 
 // Instanciate datasources, repositories and services
 const graphQLDatasource = new GraphQLDatasource(URL_GRAPHQL_ENDPOINT);
 const openSeaSalesRepository = new OpenseaSalesRepository(graphQLDatasource);
-const openSeaSaleService = new OpenSeaSalesService(openSeaSalesRepository);
+const tokenZeroRepository = new TokenZeroRepository(graphQLDatasource);
+const openSeaSaleService = new OpenSeaSalesService(
+  openSeaSalesRepository,
+  tokenZeroRepository
+);
 
 type Collection = "curated" | "playground" | "factory";
 
 type OpenSeaSalesFilter = {
-  collectionFilter?: Collection,
-  contractFilterType?: "ONLY" | "ONLY_NOT"
-  contractsFilter?: string[]
+  collectionFilter?: Collection;
+  contractFilterType?: "ONLY" | "ONLY_NOT";
+  contractsFilter?: string[];
 };
 
 const reportService = new ReportService();
@@ -33,9 +38,14 @@ const reportService = new ReportService();
 function generateFriendlyCsvOutputFilePath(
   command: string,
   previousBlock: number,
-  currentBlock: number
+  currentBlock: number,
+  useOpenSeaApi: boolean
 ): string {
-  return REPORTS_FOLDER + `/${command}_${previousBlock}_${currentBlock}.csv`;
+  const osApiSuffix = useOpenSeaApi ? "_osAPI" : "";
+  return (
+    REPORTS_FOLDER +
+    `/${command}_${previousBlock}_${currentBlock}${osApiSuffix}.csv`
+  );
 }
 
 /**
@@ -56,11 +66,20 @@ async function getCurrentBlockNumber() {
 async function processSales(
   blockRange: [number, number],
   openseaSalesFilter: OpenSeaSalesFilter,
-  csvOutputFilePath?: string,
+  useOpenSeaApi,
+  csvOutputFilePath?: string
 ) {
-  let openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbers(
-    blockRange
-  );
+  let openSeaSales: T_OpenSeaSale[];
+  if (!useOpenSeaApi) {
+    openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbers(
+      blockRange
+    );
+  } else {
+    // use OpenSea api instead of our subgraph to build an openSeaSales object
+    openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbersOSAPI(
+      blockRange
+    );
+  }
 
   console.info(`[INFO] ${openSeaSales.length} OpenSea sales have been fetched`);
 
@@ -81,29 +100,37 @@ async function processSales(
     const openSeaSaleLookupTables = openSeaSale.openSeaSaleLookupTables;
 
     let nbTokenSold = 0;
-    let filteredOpenSeaSaleLookupTables = openSeaSaleLookupTables.filter((openSeaSaleLookupTable) => {
-      nbTokenSold += 1;
+    let filteredOpenSeaSaleLookupTables = openSeaSaleLookupTables.filter(
+      (openSeaSaleLookupTable) => {
+        nbTokenSold += 1;
 
-      if (nbTokenSold > 1) {
-        additionalSalesFoundInBundledSales += 1;
+        if (nbTokenSold > 1) {
+          additionalSalesFoundInBundledSales += 1;
+        }
+
+        const token = openSeaSaleLookupTable.token;
+        const curationFilterPass =
+          collectionFilter == undefined ||
+          token.project.curationStatus === collectionFilter;
+
+        // TODO - need to check that ALL tokens in bundle have the same contract here or else OS doesn't pay royalties
+        // wait to update until AFTER subgraph updates are validated.
+        const contractsFilterPass =
+          contractFilterType === undefined ||
+          (contractFilterType == "ONLY" &&
+            contractsFilter!.includes(token.contract.id)) ||
+          (contractFilterType == "ONLY_NOT" &&
+            !contractsFilter!.includes(token.contract.id));
+
+        if (curationFilterPass === false) {
+          skippedCurationStatus += 1;
+        } else if (contractsFilterPass === false) {
+          skippedOtherContractsTokens += 1;
+        }
+
+        return curationFilterPass && contractsFilterPass;
       }
-
-      const token = openSeaSaleLookupTable.token;
-      const curationFilterPass = collectionFilter == undefined || token.project.curationStatus === collectionFilter;
-
-      const contractsFilterPass =
-        contractFilterType === undefined
-        || ((contractFilterType == "ONLY" && contractsFilter!.includes(token.contract.id)) ||
-          (contractFilterType == "ONLY_NOT" && !contractsFilter!.includes(token.contract.id)));
-
-      if (curationFilterPass === false) {
-        skippedCurationStatus += 1;
-      } else if (contractsFilterPass === false) {
-        skippedOtherContractsTokens += 1;
-      }
-
-      return curationFilterPass && contractsFilterPass;;
-    });
+    );
 
     // WARNING: Replace the openSeaSaleLookupTables by the filteredOpenSeaSaleLookupTables
     openSeaSale.openSeaSaleLookupTables = filteredOpenSeaSaleLookupTables;
@@ -114,7 +141,7 @@ async function processSales(
   if (additionalSalesFoundInBundledSales > 0) {
     console.info(
       `[INFO] Found ${additionalSalesFoundInBundledSales} ` +
-      `additional individual token sales while un-bundling bundled sales`
+        `additional individual token sales while un-bundling bundled sales`
     );
   }
 
@@ -122,7 +149,7 @@ async function processSales(
   if (skippedCurationStatus) {
     console.info(
       `[INFO] Skipped ${skippedCurationStatus} ` +
-      `tokens not in collection ${collectionFilter}`
+        `tokens not in collection ${collectionFilter}`
     );
   }
 
@@ -130,7 +157,7 @@ async function processSales(
   if (skippedOtherContractsTokens) {
     console.info(
       `[INFO] Skipped ${skippedOtherContractsTokens} ` +
-      `tokens because of ${contractFilterType} in [${contractsFilter}]`
+        `tokens because of ${contractFilterType} in [${contractsFilter}]`
     );
   }
 
@@ -143,8 +170,8 @@ async function processSales(
 
   console.info(
     `[INFO] ${openSeaSales.length} OpenSea sales remaining after filtering ` +
-    `private sales without royalties (prior to block ` +
-    `${BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES})`
+      `private sales without royalties (prior to block ` +
+      `${BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES})`
   );
 
   // if nothing found, alert and return
@@ -153,9 +180,8 @@ async function processSales(
     return;
   }
 
-  const projectReports = openSeaSaleService.generateProjectReports(
-    openSeaSales,
-  );
+  const projectReports =
+    openSeaSaleService.generateProjectReports(openSeaSales);
 
   if (csvOutputFilePath !== undefined) {
     const csvRawOutputFilePath = csvOutputFilePath.replace(".csv", "_raw.csv");
@@ -213,19 +239,19 @@ yargs(hideBin(process.argv))
           description:
             "A filter to only process sales of Art Blocks flagship product (i.e. excludes PBAB)",
           type: "boolean",
-          conflicts: "PBAB"
+          conflicts: "PBAB",
         })
         .option("PBAB", {
           description:
             "A filter to only process sales of Art Blocks PBAB products",
           type: "boolean",
-          conflicts: "flagship"
+          conflicts: "flagship",
         })
         .option("contract", {
           description:
             "A filter to only process sales of the given contract address",
           type: "string",
-          conflicts: ["flagship", "PBAB"]
+          conflicts: ["flagship", "PBAB"],
         })
         .option("csv", {
           description:
@@ -237,6 +263,12 @@ yargs(hideBin(process.argv))
           description:
             "Specify the file path where the CSV files will be stored. Requires the --csv flag to be set.",
           type: "string",
+        })
+        .option("osAPI", {
+          description:
+            "If present, the OpenSea api will be used instead of the subgraph. FLAGSHIP ONLY (NO PBAB).",
+          type: "boolean",
+          conflicts: "PBAB",
         });
     },
     async (argv) => {
@@ -246,27 +278,42 @@ yargs(hideBin(process.argv))
       let writeToCsv = argv.csv !== undefined;
       let outputPath = argv.outputPath as string | undefined;
 
+      let useOpenSeaApi = argv.osAPI as boolean | false;
+      console.info("[INFO] Use OpenSea API? -> ", useOpenSeaApi);
+
       const collection = argv.collection as Collection | undefined;
       let openSeaSalesFilter: OpenSeaSalesFilter = {
         collectionFilter: collection,
-      }
+      };
 
       // Those 3 optional params are conflicting with each others, only one
       // can be specified at a time
       const flagship = argv.flagship as boolean | undefined;
       const pbab = argv.PBAB as boolean | undefined;
+      if (useOpenSeaApi && !flagship) {
+        console.error(
+          "[ERROR] OpenSea API mode currently requires the --flagship flag"
+        );
+        throw "invalid configuration";
+      }
       let contract = argv.contract as string | undefined;
+      if (useOpenSeaApi && !flagship) {
+        console.error(
+          "[ERROR] OpenSea API mode currently does not support single contract mode"
+        );
+        throw "invalid configuration";
+      }
 
       if (flagship) {
-        openSeaSalesFilter.contractFilterType = "ONLY"
-        openSeaSalesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS
+        openSeaSalesFilter.contractFilterType = "ONLY";
+        openSeaSalesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS;
       } else if (pbab) {
-        openSeaSalesFilter.contractFilterType = "ONLY_NOT"
-        openSeaSalesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS
+        openSeaSalesFilter.contractFilterType = "ONLY_NOT";
+        openSeaSalesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS;
       } else if (contract) {
         contract = contract.toLowerCase();
-        openSeaSalesFilter.contractFilterType = "ONLY"
-        openSeaSalesFilter.contractsFilter = [contract]
+        openSeaSalesFilter.contractFilterType = "ONLY";
+        openSeaSalesFilter.contractsFilter = [contract];
       }
 
       // ensure ending block < currentBlock via etherscan api
@@ -283,7 +330,8 @@ yargs(hideBin(process.argv))
         outputPath = generateFriendlyCsvOutputFilePath(
           "since",
           startingBlock,
-          endingBlock
+          endingBlock,
+          useOpenSeaApi
         );
       }
 
@@ -296,7 +344,8 @@ yargs(hideBin(process.argv))
       await processSales(
         [startingBlock, endingBlock],
         openSeaSalesFilter,
-        outputPath,
+        useOpenSeaApi,
+        outputPath
       );
     }
   )

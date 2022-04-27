@@ -59,11 +59,19 @@ This command processes and summarizes all OpenSea sales after `startingBlock` (i
 - `--contract`: filter to only a specific core contract. Generally useful when filtering to specific PBAB contract.
 - `--csv`: boolean, output results to csv
 - `--outputPath`: set if override of default output path is desired
+- `--osAPI`: use OpenSea's API instead of the subgraph. This relies on OpenSea to
+have tokens in appropriate collections, trusts the data in their database, etc.
 
 A common example of a query running this command is:
 ```
 yarn start range 13960989 13995989 --flagship --csv
 ```
+
+If getting the same data from the OpenSea API (instead of subgraph):
+```
+yarn start range 13960989 13995989 --flagship --csv --osAPI
+```
+
 
 For limiting to a specific contract, e.g. PBAB partner Doodle Labs, the following example query would be appropriate:
 ```

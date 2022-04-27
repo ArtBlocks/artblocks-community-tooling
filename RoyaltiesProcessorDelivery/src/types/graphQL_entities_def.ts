@@ -11,29 +11,36 @@ type T_Contract = {
     id: string
 }
 
-type T_Token = {
-    id: string
-    contract: T_Contract
-    project: T_Project,
-}
+export type T_Token = {
+  id: string;
+  tokenId: number;
+  contract: T_Contract;
+  project: T_Project;
+};
 
-type T_OpenSeaSaleLookupTable = {
-    id: string,
-    token: T_Token,
-    openSeaSale: T_OpenSeaSale
-}
+export type T_OpenSeaSaleLookupTable = {
+  id: string;
+  token: T_Token;
+  //openSeaSale: T_OpenSeaSale;
+};
 
 export type T_OpenSeaSale = {
-    id: string;
-    saleVersion: "V1" | "V2";
-    saleType: "Single" | "Bundle";
-    blockNumber: number;
-    blockTimestamp: string;
-    seller: string;
-    buyer: string;
-    paymentToken: string;
-    price: string;
-    isPrivate: boolean;
-    summaryTokensSold: string;
-    openSeaSaleLookupTables: T_OpenSeaSaleLookupTable[];
+  id: string;
+  saleVersion: "V1" | "V2" | "Vunknown";
+  saleType: "Single" | "Bundle";
+  blockNumber: number;
+  blockTimestamp: string;
+  seller: string;
+  buyer: string;
+  paymentToken: string;
+  price: string;
+  isPrivate: boolean;
+  summaryTokensSold: string;
+  openSeaSaleLookupTables: T_OpenSeaSaleLookupTable[];
+};
+
+export type T_TokenZero = {
+  id: string;
+  curationStatus: string;
+  tokens: T_Token[];
 };
