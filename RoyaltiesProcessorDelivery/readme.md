@@ -60,7 +60,8 @@ This command processes and summarizes all OpenSea sales after `startingBlock` (i
 - `--csv`: boolean, output results to csv
 - `--outputPath`: set if override of default output path is desired
 - `--osAPI`: use OpenSea's API instead of the subgraph. This relies on OpenSea to
-have tokens in appropriate collections, trusts the data in their database, etc.
+have categorized tokens in appropriate collections, collections haven't changed between time of sale and time of query, trusts the data in OpenSea's database, etc. 
+  >Note: Using OpenSea API mode only works for flagship projects, and purposfully does not include any projects that fall under the `cryptocitizensofficial` OpenSea collection slug (i.e. CryptoNewYorker and CryptoVenetian), for which royalies go directly to PBAB partners.
 
 A common example of a query running this command is:
 ```
@@ -85,28 +86,28 @@ Until properly handled, these assumptions may result in incorrect payment estima
 
 **Artist payments +/-**:
 - Assumes all artists always have a 5% royalty and AB always has a 2.5% royalty
-  - This is not always true, e.g.: https://etherscan.io/tx/0x8e32abbe9d6ebdb9ec4bc79c1ad176a56317f4716203cffe3dbddbb303915f89
   - Recommend a config file to define this by-project in the future, or encourage the use of Royalty Registry
 - Assumes artist/additional payee split has NOT CHANGED between first block queried and current block when script is ran.
   - This is relatively unconcerning in most cases. However, clear communication and awareness must be used regarding how splits change over time.
 
 **Underestimates Artist Payments**:
-- Assumes only one OpenSea sale (i.e. call to `atomicMatch_`) occurs per transaction
+- (when NOT using OpenSea API mode*) Assumes only one OpenSea sale (i.e. call to `atomicMatch_`) occurs per transaction
   - This is not true in all cases, especially for arbitrage bots
     - e.g. https://etherscan.io/tx/0x128763e116ec0f0760bd64f7cbb066b67458f35317d5911a9357734463a91c4a
   - The solution to this is to update the subgraph schema to not use `tx_hash` as a primary key for the OpenSeaSale entity
   - Current behavior of subgraph is that only the last sale to occur in a tx is recorded (overwrites all previous sales in tx)
 
 **Overestimates Artist Payments**:
-- Assumes bundled sales ONLY contain Art Blocks flagship or PBAB pieces
+- (when NOT using OpenSea API mode*) Assumes bundled sales ONLY contain Art Blocks flagship or PBAB pieces
   - Royalties collected in bulk-sales are divided by total number of tokens in the sale. Our subgraph only tracks Art Blocks tokens. When a bulk sale contains both Art Blocks token(s) *and* non-Art Blocks tokens, the script divides total royalty by the qty of Art Blocks tokens instead qty of all tokens.
   - Typically ~small portion of total sales
   - Solution to this is to either change the behavior of public subgraph's handling of bulk sales, or use a different source for bulk transactions that contain Art Blocks tokens.
     - Different sources could be: parse logs via web3 calls for *every* transaction (significant usage of web3 provider), or trust OpenSea's api and get sale information for every transaction. The subgraph may be able to indicate bulk transacitons, which would reduce queries.
-- Assumes royalties are being collected in bulk private sales at or after block `13147635`
-  - Spot checks indicate OpenSea is **NOT** collecting royalties on bulk private sales, only single-token private sales
+- (when NOT using OpenSea API mode*) Assumes royalties are being collected in bulk private sales at or after block `13147635`
+  - In reality, it appears that OpenSea only collects artist royalties on bundle sales that also contain tokens from a single OpenSea collection
   - TBD if OpenSea decides to change royalty policies in the future
 
+*-When using OpenSea API mode, results appear to be entirely accurate because OpenSea excludes sale events from our queries when artist royalties were not collected.
 # Dependencies
 
 The scripts in this project depend on Art Blocks public hosted subgraph. This can be found at https://thegraph.com/hosted-service/subgraph/artblocks/art-blocks.
