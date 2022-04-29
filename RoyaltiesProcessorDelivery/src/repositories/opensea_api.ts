@@ -63,30 +63,61 @@ function openSeaEventModelToSubgraphModel(
       });
     } else {
       // bundle sale
-      for (let i = 0; i < _event.asset_bundle.assets.length; i++) {
-        // only add the assets that are in this collection
-        // (since we will get other collections from OS API elsewhere)
-        if (_event.asset_bundle.assets[i].collection.slug === collectionSlug) {
-          const _token: T_Token = {
-            id: `${tokenZero.tokens[0].contract.id}-${_event.asset_bundle.assets[i].token_id}`,
-            tokenId: _event.asset_bundle.assets[i].token_id,
-            contract: { ...tokenZero.tokens[0].contract },
-            project: { ...tokenZero.tokens[0].project },
-          };
-          _openSeaLookupTables.push({
-            id: `${tokenZero.tokens[0].project.id}::${_token.id}::${_event.id}`,
-            token: _token,
-          });
-        } else {
-          // (It is not expected that we will see multi-collection bundle sales
-          // because OpenSea is not expected to collect royalties on these sales)
-          console.warn(
-            `[WARN] Bundle sale with multiple collection slugs found. This is unexpected. Sale tx hash: ${_event.transaction.transaction_hash}`
-          );
-          console.warn(
-            `[WARN] PLEASE CONTACT DEVS ABOUT WARNING ABOVE (script logic may require updating)`
-          );
+      // only include bundle sales if all tokens are in same collection
+      if (
+        _event.asset_bundle.assets.every((_asset, _, _asset_bundle) => {
+          return _asset.collection.slug === _asset_bundle[0].collection.slug;
+        })
+      ) {
+        for (let i = 0; i < _event.asset_bundle.assets.length; i++) {
+          // only add the assets that are in this collection
+          // (since we will get other collections from OS API elsewhere)
+          let openSeaCollectionSlug: string =
+            _event.asset_bundle.assets[i].collection.slug;
+          if (
+            openSeaCollectionSlug.includes(collectionSlug) &&
+            openSeaCollectionSlug !== collectionSlug
+          ) {
+            console.warn(
+              `[WARN] Token id ${_event.asset_bundle.assets[i].token_id} expected in OpenSea collection ${collectionSlug}, but actually in ${openSeaCollectionSlug}. Analyzing as if in expected collection slug: ${collectionSlug} because very similar.`
+            );
+            console.warn(
+              "[WARN] Please contact Devs or OpenSea to have token above moved to correct collection."
+            );
+            _event.asset_bundle.assets[i].collection.slug = collectionSlug;
+          }
+          if (
+            _event.asset_bundle.assets[i].collection.slug === collectionSlug
+          ) {
+            const _token: T_Token = {
+              id: `${tokenZero.tokens[0].contract.id}-${_event.asset_bundle.assets[i].token_id}`,
+              tokenId: _event.asset_bundle.assets[i].token_id,
+              contract: { ...tokenZero.tokens[0].contract },
+              project: { ...tokenZero.tokens[0].project },
+            };
+            _openSeaLookupTables.push({
+              id: `${tokenZero.tokens[0].project.id}::${_token.id}::${_event.id}`,
+              token: _token,
+            });
+          } else {
+            // Unexpected behavior
+            console.error(
+              `[ERROR] Univorm Bundle sale containing tokens from different collection encountered. Unexpected response from OpenSea API.`
+            );
+            console.warn(
+              `[ERROR] Sale tx hash: ${_event.transaction.transaction_hash}`
+            );
+            console.info(
+              `[ERROR] OS API's reported token collection slug: ${_event.asset_bundle.assets[i].collection.slug}`
+            );
+            console.info(`[ERROR] expected slug: ${collectionSlug}`);
+            throw "[ERROR] Unexpected OS API response - please contact devs";
+          }
         }
+      } else {
+        console.warn(
+          `[WARN] Unexpected, but have observed - OpenSea api included a bundle sale with tokens in different collection slugs. Skipping, because don't expect OpenSea to have collected Artist royalties. Sale tx hash: ${_event.transaction.transaction_hash}`
+        );
       }
     }
     /**
@@ -154,12 +185,9 @@ export async function getOpenSeaSalesEvents(
           method: "get",
           headers: headers,
         });
-      } catch (error) {
-        console.debug(error);
-      }
+      } catch (error) {}
       if (!response.ok) {
-        console.error(response);
-        console.error(
+        console.warn(
           `[WARN] Error while retrieving sales for collection ${collectionSlug}. Cooling off for 5 seconds to avoid 429 errors.`
         );
         await delay(5000);

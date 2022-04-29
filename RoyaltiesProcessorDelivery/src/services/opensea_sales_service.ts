@@ -42,13 +42,17 @@ async function getBlockTimestamp(blockNumber) {
     if (data.result.timeStamp !== undefined) {
       success = true;
     } else {
-      if (retries > maxRetries) {
+      if (retries >= maxRetries) {
         console.error(
           `[ERROR] reached maximum retries when getting block timestamp via etherscan api for block number ${blockNumber}`
         );
         throw "[ERROR] exiting due to etherscan api failure";
       }
       retries++;
+      console.warn(
+        `[WARN] Etherscan API failure... Retry ${retries} of ${maxRetries}...`
+      );
+      await delay(5000);
     }
   }
   return parseInt(data.result.timeStamp);
