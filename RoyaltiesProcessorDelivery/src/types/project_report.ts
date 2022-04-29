@@ -74,9 +74,9 @@ export class ProjectReport {
       }
 
       volume.total = volume.total.add(priceAttributedToProject);
-      volume[openSeaSale.saleVersion] = volume[openSeaSale.saleVersion].add(
-        priceAttributedToProject
-      );
+      volume[openSeaSale.openSeaVersion] = volume[
+        openSeaSale.openSeaVersion
+      ].add(priceAttributedToProject);
 
       this.#paymentTokenVolumes.set(cryptoName, volume);
     }
