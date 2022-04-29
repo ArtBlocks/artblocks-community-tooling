@@ -14,7 +14,6 @@ const OPENSEA_API_KEY = process.env.OPENSEA_API_KEY;
 const MAX_RETRIES = 15;
 
 // returns the OpenSea asset's collection slug as a string
-// @dev doesn't handle errors
 export async function getOpenSeaAssetCollectionSlug(
   contractAddress: string,
   tokenId: string
@@ -31,8 +30,7 @@ export async function getOpenSeaAssetCollectionSlug(
 
 // returns OpenSea sales events for a given collection slug between timestamp
 // bound (exclusive).
-// ONLY returns sales performed on OpenSea's contracts.
-// @dev doesn't handle errors
+// only returns sales performed on OpenSea's contracts.
 export async function getOpenSeaSalesEvents(
   collectionSlug: string,
   tokenZero: T_TokenZero,
@@ -96,7 +94,8 @@ export async function getOpenSeaSalesEvents(
     const data = await response.json();
     const newOpenSeaSales = data.asset_events.map((_event) => {
       const _saleType = _event.asset_bundle === null ? "Single" : "Bundle";
-      // only length of _summaryTokensSold matters, uses :: separater
+      // other part of codebase uses length of _summaryTokensSold split by ::
+      // to divide up royalty payments on bundle sales, so use same encoding
       let _summaryTokensSold = "dummy";
       let _numTokensSold = 1;
       if (_saleType == "Bundle") {
@@ -106,10 +105,8 @@ export async function getOpenSeaSalesEvents(
           _numTokensSold++;
         }
       }
-      // other options for paymentToken are .symbol ("ETH") or .name ("ether")
       const _openSeaLookupTables: T_OpenSeaSaleLookupTable[] = [];
-      // populate this with equivalent data as defined in opensea_sales_repository.ts
-      // this is because we need to know artist address, everything.
+      // populate this with same data as defined in opensea_sales_repository.ts
       if (_saleType === "Single") {
         const _token: T_Token = {
           // single sale
@@ -125,7 +122,7 @@ export async function getOpenSeaSalesEvents(
       } else {
         // bundle sale
         for (let i = 0; i < _event.asset_bundle.assets.length; i++) {
-          // ONLY ADD the assets that are in this collection
+          // only add the assets that are in this collection
           // (since we will get other collections from OS API elsewhere)
           if (
             _event.asset_bundle.assets[i].collection.slug === collectionSlug
@@ -140,10 +137,15 @@ export async function getOpenSeaSalesEvents(
               id: `${tokenZero.tokens[0].project.id}::${_token.id}::${_event.id}`,
               token: _token,
             });
+          } else {
+            // (It is not expected that we will see multi-collection bundle sales
+            // because OpenSea is not expected to collect royalties on these sales)
+            console.warn(`[WARN] Bundle sale with multiple collection slugs found. This is unexpected. Sale tx hash: ${_event.transaction.transaction_hash}`)
+            console.warn(`[WARN] PLEASE CONTACT DEVS ABOUT WARNING ABOVE (script logic may require updating)`)
           }
         }
       }
-      // should bulk and private sales be included? YES ->
+      // should bundle private sales be included? YES ->
       // example of two squiggles in bulk, OS collected 10%, so we should get paid
       // and it was a private sale, so bulk private sales are good to include
       // 0x2e3fb6389523431ff3a52f1ccb8a24ab9985b2a8f76730b2432a15150afc110d <-- hash

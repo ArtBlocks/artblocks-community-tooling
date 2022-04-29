@@ -113,8 +113,9 @@ async function processSales(
           collectionFilter == undefined ||
           token.project.curationStatus === collectionFilter;
 
-        // TODO - need to check that ALL tokens in bundle have the same contract here or else OS doesn't pay royalties
-        // wait to update until AFTER subgraph updates are validated.
+        // TODO in future PR - need to check that ALL tokens in bundle have the
+        // same OS collection slug or else OS doesn't pay royalties
+
         const contractsFilterPass =
           contractFilterType === undefined ||
           (contractFilterType == "ONLY" &&
@@ -279,7 +280,7 @@ yargs(hideBin(process.argv))
       let outputPath = argv.outputPath as string | undefined;
 
       let useOpenSeaApi = argv.osAPI as boolean | false;
-      console.info("[INFO] Use OpenSea API? -> ", useOpenSeaApi);
+      console.info("[INFO] Use OpenSea API Mode? -> ", !!useOpenSeaApi);
 
       const collection = argv.collection as Collection | undefined;
       let openSeaSalesFilter: OpenSeaSalesFilter = {
