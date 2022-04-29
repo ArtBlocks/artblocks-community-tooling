@@ -59,8 +59,7 @@ This command processes and summarizes all OpenSea sales after `startingBlock` (i
 - `--contract`: filter to only a specific core contract. Generally useful when filtering to specific PBAB contract.
 - `--csv`: boolean, output results to csv
 - `--outputPath`: set if override of default output path is desired
-- `--osAPI`: use OpenSea's API instead of the subgraph. This relies on OpenSea to
-have categorized tokens in appropriate collections, collections haven't changed between time of sale and time of query, trusts the data in OpenSea's database, etc. 
+- `--osAPI`: gathers sales events from OpenSea's API instead of the subgraph. This relies on OpenSea to have categorized tokens in appropriate collections, collections haven't changed between time of sale and time of query, trusts the data in OpenSea's database, etc. Note that subgraph is still used to enumerate projects on core contract. Also note that project slugs are cached by default, and may be invalidated by deleting the `./slug_cache` directory (clearing cache only required if OpenSea changes a project's collection slug).
   >Note: Using OpenSea API mode only works for flagship projects, and purposfully does not include any projects that fall under the `cryptocitizensofficial` OpenSea collection slug (i.e. CryptoNewYorker and CryptoVenetian), for which royalies go directly to PBAB partners.
 
 A common example of a query running this command is:

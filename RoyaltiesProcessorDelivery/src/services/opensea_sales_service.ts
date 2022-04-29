@@ -141,12 +141,13 @@ export class OpenSeaSalesService {
     return openSeaSales;
   }
 
-  // This function mirrors getAllSalesBetweenBlockNumbers, but uses the OpenSea
-  // API instead of subgraph. Still uses subgraph to get token zero of all
-  // projects, which are required to enumerate collection slugs on OpenSea,
-  // which are required to query sales events (our contract address filters
-  // don't work on OpenSea's api because of how they organize our collections)
-  async getAllSalesBetweenBlockNumbersOSAPI(
+  /**
+   * This function mirrors getAllSalesBetweenBlockNumbers, but uses the OpenSea
+   * API instead of subgraph. Still uses subgraph to get token zero of all
+   * projects, which are required to enumerate collection slugs on OpenSea,
+   * which are required to query sales events.
+   */
+  async getAllSalesBetweenBlockNumbersOsApi(
     blockRange: [number, number]
   ): Promise<T_OpenSeaSale[]> {
     const first = 1000;
@@ -154,10 +155,9 @@ export class OpenSeaSalesService {
     let openSeaSales: T_OpenSeaSale[] = [];
     // get token zeros for every project of interest
     let tokenZeros: T_TokenZero[] = [];
-    await this.#tokenZeroRepository.getAllTokenZeros({ first, skip: 0 });
 
     while (true) {
-      console.log(`Fetching last ${first} token zeros from subgraph...`);
+      console.log(`Fetching first ${first} token zeros from subgraph...`);
       const newTokenZeros = await this.#tokenZeroRepository.getAllTokenZeros({
         first,
         skip: 0,
@@ -178,9 +178,9 @@ export class OpenSeaSalesService {
       // some other way than just using projects() query if future-proofing.
     }
     console.log("");
-    // query OpenSea's asset api for every token zero to build array of collection
-    // slugs for which events must be retrieved
+    // query OpenSea api for every token zero to build array of collection slugs
     // iterate one-by-one to eliminate too-many-calls response from OS API
+    // use local cache because this takes a long time due to OS's API.
     const slugsAndTokenZeros: T_SlugAndTokenZero[] = [];
     for (let i = 0; i < tokenZeros.length; i++) {
       const _tokenZero = tokenZeros[i];
@@ -208,9 +208,9 @@ export class OpenSeaSalesService {
             "[WARNING] likely too many requests... cooling down for 20 seconds"
           );
           await delay(15000);
-          // OS API makes us fail once more before working
+          // OS API appears to make us fail once more before working
           try {
-            const _dummy = await getOpenSeaAssetCollectionSlug(
+            await getOpenSeaAssetCollectionSlug(
               _tokenZero.tokens[0].contract.id,
               _tokenZero.tokens[0].tokenId.toString()
             );
@@ -229,12 +229,11 @@ export class OpenSeaSalesService {
           collectionSlug: collectionSlug,
           tokenZero: _tokenZero,
         });
-        // add slug to cache
+        // add slug to cache, save
         collectionSlugCache.setKey(
           _tokenZero.tokens[0].project.id,
           collectionSlug
         );
-        // save collection slug cache
         collectionSlugCache.save(true);
         // Throttle due to OpenSea API rate limiting
         await delay(500);

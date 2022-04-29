@@ -76,7 +76,7 @@ async function processSales(
     );
   } else {
     // use OpenSea api instead of our subgraph to build an openSeaSales object
-    openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbersOSAPI(
+    openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbersOsApi(
       blockRange
     );
   }
