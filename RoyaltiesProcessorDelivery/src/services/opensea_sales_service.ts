@@ -201,34 +201,10 @@ export class OpenSeaSalesService {
           tokenZero: _tokenZero,
         });
       } else {
-        try {
-          collectionSlug = await getOpenSeaAssetCollectionSlug(
-            _tokenZero.tokens[0].contract.id,
-            _tokenZero.tokens[0].tokenId.toString()
-          );
-        } catch (error) {
-          // likely too many requests, cool off for ten seconds
-          console.warn(
-            "[WARNING] likely too many requests... cooling down for 20 seconds"
-          );
-          await delay(15000);
-          // OS API appears to make us fail once more before working
-          try {
-            await getOpenSeaAssetCollectionSlug(
-              _tokenZero.tokens[0].contract.id,
-              _tokenZero.tokens[0].tokenId.toString()
-            );
-          } catch {
-            console.log("[INFO] failed once more as expected");
-          }
-          await delay(5000);
-          console.info("[INFO] resuming");
-          collectionSlug = await getOpenSeaAssetCollectionSlug(
-            _tokenZero.tokens[0].contract.id,
-            _tokenZero.tokens[0].tokenId.toString()
-          );
-          console.debug("[INFO] successfully recovered");
-        }
+        collectionSlug = await getOpenSeaAssetCollectionSlug(
+          _tokenZero.tokens[0].contract.id,
+          _tokenZero.tokens[0].tokenId.toString()
+        );
         slugsAndTokenZeros.push({
           collectionSlug: collectionSlug,
           tokenZero: _tokenZero,
@@ -239,8 +215,6 @@ export class OpenSeaSalesService {
           collectionSlug
         );
         collectionSlugCache.save(true);
-        // Throttle due to OpenSea API rate limiting
-        await delay(500);
       }
     }
     // OS api works in terms of timestamps, not blocks.
