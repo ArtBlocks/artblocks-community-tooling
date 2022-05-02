@@ -102,7 +102,7 @@ function openSeaEventModelToSubgraphModel(
           } else {
             // Unexpected behavior
             console.error(
-              `[ERROR] Univorm Bundle sale containing tokens from different collection encountered. Unexpected response from OpenSea API.`
+              `[ERROR] Uniform Bundle sale containing tokens from different collection encountered. Unexpected response from OpenSea API.`
             );
             console.warn(
               `[ERROR] Sale tx hash: ${_event.transaction.transaction_hash}`
@@ -221,9 +221,7 @@ export async function getOpenSeaSalesEvents(
       if (newOpenSeaSales[i].blockNumber >= minBlockNumber) {
         openSeaSales.push(newOpenSeaSales[i]);
       } else {
-        // break (sales ordered recent to oldest)
         _reachedMinBlockNumber = true;
-        break;
       }
     }
     // stop scrolling through OpenSea API
