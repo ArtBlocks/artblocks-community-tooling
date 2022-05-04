@@ -18,6 +18,8 @@ At the project root run the following commands:
 yarn install
 ````
 
+You will also need to create a `.env` file at this directory's root populated with an OpenSea API key (see `.env.example` for format). The API key is always required because royalty collection logic for bundle sales on OpenSea's platform depends on each token's OpenSea collection slug, which is defined off-chain and can therefore not be included in the Art Blocks subgraph.
+
 ## Basic Usage Overview & Example
 
 This tool should be ran from a command line interface.
