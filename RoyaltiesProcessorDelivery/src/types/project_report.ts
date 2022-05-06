@@ -50,11 +50,7 @@ export class ProjectReport {
     addSale(openSeaSale: T_OpenSeaSale, nbTokensSold: number) {
       this.#totalSales += 1;
 
-      // The price is divided between the number of tokens in the sale
-      //      : The subgraph only register AB tokens in for Bundle. If the bundle contains other NFTs
-      //!       royalties aren't collected anyway, so they (TODO: will) already filtered out before here.
-      //!       But this edges case is extremely rare
-      //!       (This is noted as an assumption in readme)
+      // The price is divided equally between the number of tokens in the sale
       const priceAttributedToProject = BigNumber.from(openSeaSale.price).div(
         nbTokensSold
       );

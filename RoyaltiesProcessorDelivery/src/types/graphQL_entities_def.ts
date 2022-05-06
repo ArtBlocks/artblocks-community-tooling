@@ -40,7 +40,7 @@ export type T_OpenSeaSale = {
 };
 
 export type T_TokenZero = {
-  id: string;
+  id: string; // subgraph's Project entity id for this TokenZero
   curationStatus: string;
   tokens: T_Token[];
 };

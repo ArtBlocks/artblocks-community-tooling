@@ -102,17 +102,25 @@ function openSeaEventModelToSubgraphModel(
     const _openSeaLookupTables: T_OpenSeaSaleLookupTable[] = [];
     // populate this with same data as defined in opensea_sales_repository.ts
     if (_saleType === "Single") {
-      const _token: T_Token = {
-        // single sale
-        id: `${tokenZero.tokens[0].contract.id}-${_event.asset.token_id}`,
-        tokenId: _event.asset.token_id,
-        contract: { ...tokenZero.tokens[0].contract },
-        project: { ...tokenZero.tokens[0].project },
-      };
-      _openSeaLookupTables.push({
-        id: `${tokenZero.tokens[0].project.id}:${_token.id}:${_event.id}`,
-        token: _token,
-      });
+      // single sale
+      // only push tokens that are in this TokenZero's project
+      // (many projects can be in same OS collection)
+      if (
+        `${_event.asset.asset_contract.address}-${Math.floor(
+          parseInt(_event.asset.token_id) / 1000000
+        )}` === tokenZero.id
+      ) {
+        const _token: T_Token = {
+          id: `${tokenZero.tokens[0].contract.id}-${_event.asset.token_id}`,
+          tokenId: _event.asset.token_id,
+          contract: { ...tokenZero.tokens[0].contract },
+          project: { ...tokenZero.tokens[0].project },
+        };
+        _openSeaLookupTables.push({
+          id: `${tokenZero.id}::${_token.id}::${_event.id}`,
+          token: _token,
+        });
+      }
     } else {
       // bundle sale
       // only include bundle sales if all tokens are in same collection
@@ -141,16 +149,26 @@ function openSeaEventModelToSubgraphModel(
           if (
             _event.asset_bundle.assets[i].collection.slug === collectionSlug
           ) {
-            const _token: T_Token = {
-              id: `${tokenZero.tokens[0].contract.id}-${_event.asset_bundle.assets[i].token_id}`,
-              tokenId: _event.asset_bundle.assets[i].token_id,
-              contract: { ...tokenZero.tokens[0].contract },
-              project: { ...tokenZero.tokens[0].project },
-            };
-            _openSeaLookupTables.push({
-              id: `${tokenZero.tokens[0].project.id}::${_token.id}::${_event.id}`,
-              token: _token,
-            });
+            // only push tokens that are in this TokenZero's project
+            // (many projects can be in same OS collection)
+            if (
+              `${
+                _event.asset_bundle.assets[i].asset_contract.address
+              }-${Math.floor(
+                parseInt(_event.asset_bundle.assets[i].token_id) / 1000000
+              )}` === tokenZero.id
+            ) {
+              const _token: T_Token = {
+                id: `${tokenZero.tokens[0].contract.id}-${_event.asset_bundle.assets[i].token_id}`,
+                tokenId: _event.asset_bundle.assets[i].token_id,
+                contract: { ...tokenZero.tokens[0].contract },
+                project: { ...tokenZero.tokens[0].project },
+              };
+              _openSeaLookupTables.push({
+                id: `${tokenZero.id}::${_token.id}::${_event.id}`,
+                token: _token,
+              });
+            }
           } else {
             // Unexpected behavior
             console.error(
@@ -207,12 +225,6 @@ export async function getOpenSeaSalesEvents(
   minBlockNumber: number
 ): Promise<T_OpenSeaSale[]> {
   const openSeaSales: T_OpenSeaSale[] = [];
-  if (collectionSlug === "cryptocitizensofficial") {
-    console.warn(
-      "[WARN] cryptocitizens are skipped when using OpenSea API -> royalties should be being sent to PBAB contract, not AB"
-    );
-    return openSeaSales;
-  }
   let _next = "";
   while (true) {
     let url = `https://api.opensea.io/api/v1/events?only_opensea=true&collection_slug=${collectionSlug}&event_type=successful&occurred_before=${occurredBeforeTimestamp}`;
@@ -231,6 +243,7 @@ export async function getOpenSeaSalesEvents(
     let response;
     let success = false;
     let retries = 0;
+
     while (!success) {
       try {
         response = await fetch(url, {
@@ -265,7 +278,7 @@ export async function getOpenSeaSalesEvents(
       data.asset_events
     );
     // loop through all new opensea sales to check if any before minBlockNumber
-    // if so, remove them, and also we can break out of loop because we are
+    // if so, skip them, and also we can break out of loop because we are
     // far enough back in time!
     let _reachedMinBlockNumber = false;
     for (let i = 0; i < newOpenSeaSales.length; i++) {
@@ -273,9 +286,7 @@ export async function getOpenSeaSalesEvents(
       if (newOpenSeaSales[i].blockNumber >= minBlockNumber) {
         openSeaSales.push(newOpenSeaSales[i]);
       } else {
-        // break (sales ordered recent to oldest)
         _reachedMinBlockNumber = true;
-        break;
       }
     }
     // stop scrolling through OpenSea API

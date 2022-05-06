@@ -4,7 +4,7 @@ import {
 } from "../constant";
 import fetch from "node-fetch";
 
-import { delay } from "../utils/util_functions";
+import { delay, findCommonElements } from "../utils/util_functions";
 import { OpenseaSalesRepository } from "../repositories/opensea_sales_repository";
 import { TokenZeroRepository } from "../repositories/token_zero_repository";
 import {
@@ -150,9 +150,14 @@ export class OpenSeaSalesService {
    * API instead of subgraph. Still uses subgraph to get token zero of all
    * projects, which are required to enumerate collection slugs on OpenSea,
    * which are required to query sales events.
+   * @param blockRange: start block (inclusive), end block (exclusive)
+   * @param contracts: array of contract addresses (lower case) to inlclude in this search
+   * @param projectIdsToAdd: array of projectIds to include in returned sales
    */
   async getAllSalesBetweenBlockNumbersOsApi(
-    blockRange: [number, number]
+    blockRange: [number, number],
+    contracts: string[],
+    projectIdsToAdd: string[]
   ): Promise<T_OpenSeaSale[]> {
     const first = 1000;
     // the thing we are retuning: openSeaSales array
@@ -162,10 +167,14 @@ export class OpenSeaSalesService {
 
     while (true) {
       console.log(`Fetching first ${first} token zeros from subgraph...`);
-      const newTokenZeros = await this.#tokenZeroRepository.getAllTokenZeros({
-        first,
-        skip: 0,
-      });
+      const newTokenZeros =
+        await this.#tokenZeroRepository.getAllTokenZerosOnContracts(
+          {
+            first,
+            skip: 0,
+          },
+          contracts
+        );
 
       if (newTokenZeros.length < first) {
         // found all remaining sales, no scroll required
@@ -180,6 +189,32 @@ export class OpenSeaSalesService {
       // warning to devs in future - when adding ability to scroll, keep in mind
       // that TheGraph has an upper limit on skip, so may need to filter in
       // some other way than just using projects() query if future-proofing.
+    }
+    // add any additional token zeros from projectIdsToAdd
+    if (projectIdsToAdd.length > 0) {
+      console.log(
+        `Fetching additional token zeros from subgraph for projectIds: ${projectIdsToAdd}`
+      );
+      const newTokenZeros =
+        await this.#tokenZeroRepository.getAllTokenZerosWithProjectIds(
+          {
+            first,
+            skip: 0,
+          },
+          projectIdsToAdd
+        );
+      // double check that we aren't adding the same projectId twice
+      // (should never happen, for bug catching only)
+      if (
+        findCommonElements(
+          tokenZeros.map((_TokenZero) => _TokenZero.id),
+          newTokenZeros.map((_newTokenZero) => _newTokenZero.id)
+        )
+      ) {
+        throw "projectIdsToAdd were already queried. This should never happen, check config file.";
+      }
+      // add valid new token zeros to array of total token zeros to return
+      tokenZeros.push(...newTokenZeros);
     }
     console.log("");
     // query OpenSea api for every token zero to build array of collection slugs
@@ -223,7 +258,7 @@ export class OpenSeaSalesService {
 
     // retrieve all events in timestamp/block range, for each collection
     // populate openSeaSales along the way!
-    for (let i = 0; i < Math.min(99999999, slugsAndTokenZeros.length); i++) {
+    for (let i = 0; i < slugsAndTokenZeros.length; i++) {
       const _slugAndTokenZero = slugsAndTokenZeros[i];
       console.debug(
         `[INFO] Getting OS sale events for: ${_slugAndTokenZero.collectionSlug}`
