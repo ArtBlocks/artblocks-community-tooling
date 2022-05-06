@@ -53,7 +53,7 @@ To query a specific command, e.g. `range`, run:
 # Available Commands
 
 ## range
-`index.ts range <startingBlock> [endingBlock] [collection] [flagship] [csv] [outputPath]`
+`index.ts range <startingBlock> [endingBlock] [collection] [flagship] [csv] [outputPath] [osAPI] [pbabInvoice]`
 
 This command processes and summarizes all OpenSea sales after `startingBlock` (included) and before `endingBlock` (excluded). Additional optional args:
 - `--collection`: filter to only "curated" | "factory" | "playground"
@@ -62,7 +62,8 @@ This command processes and summarizes all OpenSea sales after `startingBlock` (i
 - `--csv`: boolean, output results to csv
 - `--outputPath`: set if override of default output path is desired
 - `--osAPI`: gathers sales events from OpenSea's API instead of the subgraph. This relies on OpenSea to have categorized tokens in appropriate collections, collections haven't changed between time of sale and time of query, trusts the data in OpenSea's database, etc. Note that subgraph is still used to enumerate projects on core contract. Also note that project slugs are cached by default, and may be invalidated by deleting the `./slug_cache` directory (clearing cache only required if OpenSea changes a project's collection slug).
-  >Note: Using OpenSea API mode only works for flagship projects, and purposfully does not include any projects that fall under the `cryptocitizensofficial` OpenSea collection slug (i.e. CryptoNewYorker and CryptoVenetian), for which royalies go directly to PBAB partners.
+  >Note: Using OpenSea API mode only works with `--flagship` or `--contract`.
+- `--pbabInvoice`: generates a PBAB invoice detailed report, assuming 2.5% royalties to render provider. Must be filtered down to a single contract via `--contract` command.
 
 A common example of a query running this command is:
 ```
@@ -99,16 +100,9 @@ Until properly handled, these assumptions may result in incorrect payment estima
   - Current behavior of subgraph is that only the last sale to occur in a tx is recorded (overwrites all previous sales in tx)
 
 **Overestimates Artist Payments**:
-- (when NOT using OpenSea API mode*) Assumes bundled sales ONLY contain Art Blocks flagship or PBAB pieces
-  - Royalties collected in bulk-sales are divided by total number of tokens in the sale. Our subgraph only tracks Art Blocks tokens. When a bulk sale contains both Art Blocks token(s) *and* non-Art Blocks tokens, the script divides total royalty by the qty of Art Blocks tokens instead qty of all tokens.
-  - Typically ~small portion of total sales
-  - Solution to this is to either change the behavior of public subgraph's handling of bulk sales, or use a different source for bulk transactions that contain Art Blocks tokens.
-    - Different sources could be: parse logs via web3 calls for *every* transaction (significant usage of web3 provider), or trust OpenSea's api and get sale information for every transaction. The subgraph may be able to indicate bulk transacitons, which would reduce queries.
-- (when NOT using OpenSea API mode*) Assumes royalties are being collected in bulk private sales at or after block `13147635`
-  - In reality, it appears that OpenSea only collects artist royalties on bundle sales that also contain tokens from a single OpenSea collection
-  - TBD if OpenSea decides to change royalty policies in the future
+  - *no known bugs at this time*
 
-*-When using OpenSea API mode, results appear to be entirely accurate because OpenSea excludes sale events from our queries when artist royalties were not collected.
+*-When using OpenSea API mode, there are no known bugs at this time*
 # Dependencies
 
 The scripts in this project depend on Art Blocks public hosted subgraph. This can be found at https://thegraph.com/hosted-service/subgraph/artblocks/art-blocks.

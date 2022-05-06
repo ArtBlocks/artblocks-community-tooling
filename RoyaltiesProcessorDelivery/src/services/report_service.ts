@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import { BigNumber } from "ethers";
 import { writeFileSync } from "fs";
 
 import { ProjectReport } from "../types/project_report";
@@ -6,6 +6,8 @@ import {
   amountHumanReadable,
   ART_BLOCKS_PAYMENT_TOKENS,
 } from "../utils/token_conversion";
+
+const PBAB_ROYALTY_DENOMINATOR = BigNumber.from(1 / 0.025);
 
 export class ReportService {
   #csvSeparator: string;
@@ -73,11 +75,25 @@ export class ReportService {
     return as_str;
   }
 
-  getBlocksHeader(blockRange: [number, number]): string {
+  getDateHeader(): string {
     const sep = this.#csvSeparator;
-    const reportBlockRangeHeader = `Lower bound block${sep}Higher bound block\n`;
+    const ts = Date.now();
+    let dateTime = new Date(ts);
+    return `Report Generated:${sep}${dateTime.getFullYear()}-${
+      dateTime.getMonth() + 1
+    }-${dateTime.getDate()}\n`;
+  }
+
+  getBlocksHeader(
+    blockRange: [number, number],
+    addSpaceAfterHeader: boolean = true
+  ): string {
+    const sep = this.#csvSeparator;
+    const reportBlockRangeHeader = `Lower bound block (included)${sep}Higher bound block (excluded)\n`;
     const reportBlockRangeData = `${blockRange[0]}${sep}${blockRange[1]}\n`;
-    const spaceAfterHeader = `${sep}\n${sep}\n${sep}\n`;
+    const spaceAfterHeader = addSpaceAfterHeader
+      ? `${sep}\n${sep}\n${sep}\n`
+      : "";
     return reportBlockRangeHeader + reportBlockRangeData + spaceAfterHeader;
   }
 
@@ -110,7 +126,7 @@ export class ReportService {
     const addrToAmountDue = new Map();
     const _emptyObj = {};
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
-      _emptyObj[crypto] = ethers.BigNumber.from(0);
+      _emptyObj[crypto] = BigNumber.from(0);
     }
     for (const projectReport of projectReports) {
       const { artistAddress, additionalPayeeAddress, cryptoDue } =
@@ -203,6 +219,70 @@ export class ReportService {
     writeFileSync(csvOutputFilePath, csvData);
   }
 
+  generatePBABInvoiceCSVFromProjectReports(
+    blockRange: [number, number],
+    projectReports: ProjectReport[],
+    csvOutputFilePath: string,
+    coreContract: string
+  ): void {
+    const sep = this.#csvSeparator;
+    // Disclaimers
+    const disclaimers =
+      "Disclaimer: Values in this report represent our best estimate of OpenSea on-chain activity but no guarantee of accuracy is included. Report numbers were not produced by OpenSea and are subject to change as OpenSea's royalty collection processes change.\n" +
+      "Disclaimer: Informational-only Artist and Additional Payee percentages are assumed to not change through time and are assumed to total 5% (hard-coded - does not account for any on-chain updated values).\n\n";
+
+    // date header
+    const dateHeader = this.getDateHeader();
+
+    // block header
+    const blocksHeader = this.getBlocksHeader(blockRange, false);
+
+    // pbab invoice totals
+    let pbabInvoiceHeaderLineA = `Core Contract:${sep}${coreContract}${sep}`;
+    let pbabInvoiceHeaderLineB = `PBAB Invoice (2.5% of total volume):${sep}${sep}`;
+    for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
+      pbabInvoiceHeaderLineA += `${sep}${sep}${sep}${sep}${crypto}${sep}`;
+      let _cryptoVolume = BigNumber.from(0);
+      for (const projectReport of projectReports) {
+        const _volume = projectReport.paymentTokenVolumes.get(crypto);
+        if (_volume !== undefined) {
+          _cryptoVolume = _cryptoVolume.add(_volume.total);
+        }
+      }
+      const invoiceForCurrency = _cryptoVolume.div(PBAB_ROYALTY_DENOMINATOR);
+      pbabInvoiceHeaderLineB += `${sep}${sep}${sep}${sep}${amountHumanReadable(
+        crypto,
+        invoiceForCurrency
+      )}${sep}`;
+    }
+
+    // Build the global CSV header
+    let projectReportHeader = `PROJECT NAME${sep}TOTAL SALES${sep}ARTIST ADDRESS${sep}ADDITIONAL ADDRESS`;
+    for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
+      projectReportHeader += `${sep}V1 ${crypto} VOLUME${sep}V2 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`;
+    }
+
+    let csvData =
+      disclaimers +
+      dateHeader +
+      blocksHeader +
+      pbabInvoiceHeaderLineA +
+      "\n" +
+      pbabInvoiceHeaderLineB +
+      "\n" +
+      projectReportHeader +
+      "\n";
+
+    projectReports.sort((a, b) => a.projectId - b.projectId);
+    for (const projectReport of projectReports) {
+      const formatedReportData =
+        this._projectReportToDetailedCSV(projectReport);
+      csvData += formatedReportData;
+    }
+    console.log(`Detailed results written to ${csvOutputFilePath}`);
+    writeFileSync(csvOutputFilePath, csvData);
+  }
+
   private _projectReportToDetailedCSV(projectReport: ProjectReport): string {
     const sep = this.#csvSeparator;
     const {
@@ -215,8 +295,9 @@ export class ReportService {
     } = projectReport;
     const escapedProjectName = name.replace(sep, "");
 
-    let projectReportData = `${escapedProjectName}${sep}${totalSales}${sep}${artistAddress}${sep}${additionalPayeeAddress === undefined ? "None" : additionalPayeeAddress
-      }`;
+    let projectReportData = `${escapedProjectName}${sep}${totalSales}${sep}${artistAddress}${sep}${
+      additionalPayeeAddress === undefined ? "None" : additionalPayeeAddress
+    }`;
 
     // Loop for all possible payment token listed by Art Blocks
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {

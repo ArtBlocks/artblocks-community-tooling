@@ -223,7 +223,7 @@ export class OpenSeaSalesService {
     const slugsAndTokenZeros: T_SlugAndTokenZero[] = [];
     for (let i = 0; i < tokenZeros.length; i++) {
       const _tokenZero = tokenZeros[i];
-      console.debug(
+      console.info(
         `[INFO] Getting OS collection slug for: ${_tokenZero.tokens[0].project.name}`
       );
       let collectionSlug = collectionSlugCache.getKey(
@@ -260,7 +260,7 @@ export class OpenSeaSalesService {
     // populate openSeaSales along the way!
     for (let i = 0; i < slugsAndTokenZeros.length; i++) {
       const _slugAndTokenZero = slugsAndTokenZeros[i];
-      console.debug(
+      console.info(
         `[INFO] Getting OS sale events for: ${_slugAndTokenZero.collectionSlug}`
       );
       const _newOpenSeaSales = await getOpenSeaSalesEvents(
