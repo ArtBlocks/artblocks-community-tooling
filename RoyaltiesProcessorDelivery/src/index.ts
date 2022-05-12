@@ -8,6 +8,7 @@ import {
   BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES,
   AB_FLAGSHIP_CONTRACTS,
 } from "./constant";
+import { arraysEqual } from "./utils/util_functions";
 import { GraphQLDatasource } from "./datasources/graphQL_datasource";
 import { OpenseaSalesRepository } from "./repositories/opensea_sales_repository";
 import { ReportService } from "./services/report_service";
@@ -16,6 +17,9 @@ import { T_OpenSeaSale } from "./types/graphQL_entities_def";
 import { exit } from "process";
 import { TokenZeroRepository } from "./repositories/token_zero_repository";
 import { getOpenSeaAssetCollectionSlug } from "./repositories/opensea_api";
+
+// import config file of pbab projects on flagship contracts
+import { default as pbabProjectsOnFlagshipConfig } from "../config/pbabProjectsOnFlagship.json";
 
 // Instanciate datasources, repositories and services
 const graphQLDatasource = new GraphQLDatasource(URL_GRAPHQL_ENDPOINT);
@@ -61,24 +65,88 @@ async function getCurrentBlockNumber() {
 }
 
 /**
+ * This handles special cases such as when PBAB contracts are on flagship core.
+ * Returns two arrays - projectIds to include, and projectIds to exclude, where
+ * projectIds are in same format as Project entity id in our subgraph.
+ */
+function getProjectIdsToExcludeAndAdd(openseaSalesFilter: OpenSeaSalesFilter) {
+  const contractFilterType = openseaSalesFilter.contractFilterType;
+  const contractsFilter = openseaSalesFilter.contractsFilter;
+  // if flagship, exclude all pbab projects on flagship
+  const projectIdsToExclude: string[] = [];
+  if (
+    contractFilterType === "ONLY" &&
+    arraysEqual(contractsFilter, AB_FLAGSHIP_CONTRACTS)
+  ) {
+    projectIdsToExclude.push(
+      ...Object.keys(pbabProjectsOnFlagshipConfig).map((_projectId) =>
+        _projectId.toLowerCase()
+      )
+    );
+  }
+  // if limited to a single PBAB address, include core contract tokens that
+  // tree under that pbab project
+  const projectIdsToAdd: string[] = [];
+  if (
+    contractsFilter!.length === 1 &&
+    !AB_FLAGSHIP_CONTRACTS.includes(contractsFilter![0])
+  ) {
+    // For each item in config, if pbab contract is contract being filtered to,
+    // add projectId to the array of projectIds to add
+    Object.keys(pbabProjectsOnFlagshipConfig).forEach((_projectId) => {
+      if (
+        contractsFilter![0] ===
+        pbabProjectsOnFlagshipConfig[_projectId].pbab_contract.toLowerCase()
+      ) {
+        projectIdsToAdd.push(_projectId.toLowerCase());
+      }
+    });
+  }
+  return { projectIdsToExclude, projectIdsToAdd };
+}
+
+/**
  * This processes all Art Blocks NFT sales that occured in a given ETH mainnet
  * block range.
  */
 async function processSales(
   blockRange: [number, number],
   openseaSalesFilter: OpenSeaSalesFilter,
-  useOpenSeaApi,
+  useOpenSeaApi: boolean,
   csvOutputFilePath?: string
 ) {
+  // apply special cases based on desired filter
+  /** Handle excluded projectIds by filtering them out later in this function
+   * we handle adding extra projects by not filtering them out in this function, and:
+   *  - OpenSea API mode - explicitly including projectIdsToAdd
+   *  - subgraph mode - nothing more; already query for every token sale by default because subgraph is fast
+   */
+  const { projectIdsToExclude, projectIdsToAdd } =
+    getProjectIdsToExcludeAndAdd(openseaSalesFilter);
+
+  const collectionFilter = openseaSalesFilter.collectionFilter;
+  const contractFilterType = openseaSalesFilter.contractFilterType;
+  const contractsFilter = openseaSalesFilter.contractsFilter;
+
   let openSeaSales: T_OpenSeaSale[];
   if (!useOpenSeaApi) {
+    // get all sales of all tokens in blockrange in subgraph from subgraph
     openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbers(
       blockRange
     );
   } else {
+    // require an ONLY filter and a contractsFilter in OS API mode
+    if (
+      openseaSalesFilter.contractFilterType !== "ONLY" ||
+      openseaSalesFilter.contractsFilter === undefined
+    ) {
+      throw "ONLY filter for subset of contracts is required when using OpenSea API mode";
+    }
     // use OpenSea api instead of our subgraph to build an openSeaSales object
     openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbersOsApi(
-      blockRange
+      blockRange,
+      openseaSalesFilter.contractsFilter,
+      projectIdsToAdd
     );
   }
 
@@ -130,13 +198,11 @@ async function processSales(
     `[INFO] Removed ${bundleSalesWithMultipleCollectionSlugs} Bundle OS sales with tokens from >1 OpenSea Collection Slug.`
   );
 
-  const collectionFilter = openseaSalesFilter.collectionFilter;
-  const contractFilterType = openseaSalesFilter.contractFilterType;
-  const contractsFilter = openseaSalesFilter.contractsFilter;
-
   let additionalSalesFoundInBundledSales = 0;
   let skippedOtherContractsTokens = 0;
   let skippedCurationStatus = 0;
+  let addedTokensOnFlagship = 0;
+  let excludedTokensOnFlagship = 0;
 
   /* Among all sales, filter those we are interested in.
    * Filter the OpenSeaSales that match the given OpenSeaSalesFilter
@@ -157,12 +223,22 @@ async function processSales(
         }
 
         const token = openSeaSaleLookupTable.token;
+
+        // special case: projectId in projectIdsToAdd
+        if (projectIdsToAdd.includes(token.project.id)) {
+          addedTokensOnFlagship++;
+          return true;
+        }
+
+        // special case: projectId in projectIdsToExclude
+        if (projectIdsToExclude.includes(token.project.id)) {
+          excludedTokensOnFlagship++;
+          return false;
+        }
+
         const curationFilterPass =
           collectionFilter == undefined ||
           token.project.curationStatus === collectionFilter;
-
-        // TODO in future PR - need to check that ALL tokens in bundle have the
-        // same OS collection slug or else OS doesn't pay royalties
 
         const contractsFilterPass =
           contractFilterType === undefined ||
@@ -181,10 +257,26 @@ async function processSales(
       }
     );
 
-    // WARNING: Replace the openSeaSaleLookupTables by the filteredOpenSeaSaleLookupTables
+    // Replace the openSeaSaleLookupTables by the filteredOpenSeaSaleLookupTables
     openSeaSale.openSeaSaleLookupTables = filteredOpenSeaSaleLookupTables;
     return openSeaSale.openSeaSaleLookupTables.length > 0;
   });
+
+  // report any tokens added on flagship
+  if (addedTokensOnFlagship > 0) {
+    console.info(
+      `[INFO] Added ${addedTokensOnFlagship} ` +
+        `individual token sales on flagship in projectIds: ${projectIdsToAdd}`
+    );
+  }
+
+  // report any tokens excluded on flagship
+  if (excludedTokensOnFlagship > 0) {
+    console.info(
+      `[INFO] Excluded ${excludedTokensOnFlagship} ` +
+        `individual token sales on flagship in ProjectIds: ${projectIdsToExclude}`
+    );
+  }
 
   // report any additional tokens found
   if (additionalSalesFoundInBundledSales > 0) {
@@ -294,7 +386,7 @@ yargs(hideBin(process.argv))
           description:
             "A filter to only process sales of Art Blocks PBAB products",
           type: "boolean",
-          conflicts: "flagship",
+          conflicts: ["flagship", "collection"],
         })
         .option("contract", {
           description:
@@ -315,9 +407,9 @@ yargs(hideBin(process.argv))
         })
         .option("osAPI", {
           description:
-            "If present, the OpenSea api will be used instead of the subgraph. FLAGSHIP ONLY (NO PBAB).",
+            "If present, the OpenSea api will be used instead of the subgraph. requires either: --flagship OR --contract.",
           type: "boolean",
-          conflicts: "PBAB",
+          conflicts: ["collection", "PBAB"],
         });
     },
     async (argv) => {
@@ -341,7 +433,7 @@ yargs(hideBin(process.argv))
       const pbab = argv.PBAB as boolean | undefined;
       if (useOpenSeaApi && !flagship) {
         console.error(
-          "[ERROR] OpenSea API mode currently requires the --flagship flag"
+          "[ERROR] OpenSea API mode currently only supports --flagship"
         );
         throw "invalid configuration";
       }
@@ -393,7 +485,7 @@ yargs(hideBin(process.argv))
       await processSales(
         [startingBlock, endingBlock],
         openSeaSalesFilter,
-        useOpenSeaApi,
+        !!useOpenSeaApi,
         outputPath
       );
     }
