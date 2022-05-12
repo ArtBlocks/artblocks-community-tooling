@@ -248,7 +248,7 @@ export class OpenSeaSalesService {
 
     // retrieve all events in timestamp/block range, for each collection
     // populate openSeaSales along the way!
-    for (let i = 0; i < Math.min(99999999, slugsAndTokenZeros.length); i++) {
+    for (let i = 0; i < slugsAndTokenZeros.length; i++) {
       const _slugAndTokenZero = slugsAndTokenZeros[i];
       console.debug(
         `[INFO] Getting OS sale events for: ${_slugAndTokenZero.collectionSlug}`
