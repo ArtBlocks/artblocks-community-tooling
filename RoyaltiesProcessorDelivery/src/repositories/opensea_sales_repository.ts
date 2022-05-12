@@ -7,7 +7,7 @@ const QUERY_GET_OPENSEA_SALES = gql`
 query getOpenSeaSales($first: Int!, $skip: Int!) {
   openSeaSales(first: $first, skip: $skip, where: {WHERE_CLAUSE}, orderBy: blockNumber, orderDirection: desc) {
     id
-    saleVersion
+    openSeaVersion
     saleType
     price
     paymentToken
@@ -35,11 +35,10 @@ query getOpenSeaSales($first: Int!, $skip: Int!) {
   }
 }`;
 
-
 type T_QueryVariable_GetOpenSeaSales = {
-  first: number,
-  skip: number,
-}
+  first: number;
+  skip: number;
+};
 
 export class OpenseaSalesRepository {
   #graphQLDatasource: GraphQLDatasource;
@@ -48,8 +47,15 @@ export class OpenseaSalesRepository {
     this.#graphQLDatasource = graphQLDatasource;
   }
 
-  async getSalesBetweenBlockNumbers(variables: T_QueryVariable_GetOpenSeaSales, blockNumberGte: number, blockNumberLt: number): Promise<T_OpenSeaSale[]> {
-    const query = QUERY_GET_OPENSEA_SALES.replace("WHERE_CLAUSE", `blockNumber_gte: ${blockNumberGte}, blockNumber_lt: ${blockNumberLt}`);
+  async getSalesBetweenBlockNumbers(
+    variables: T_QueryVariable_GetOpenSeaSales,
+    blockNumberGte: number,
+    blockNumberLt: number
+  ): Promise<T_OpenSeaSale[]> {
+    const query = QUERY_GET_OPENSEA_SALES.replace(
+      "WHERE_CLAUSE",
+      `blockNumber_gte: ${blockNumberGte}, blockNumber_lt: ${blockNumberLt}`
+    );
 
     const resp = await this.#graphQLDatasource.query(query, variables);
     return resp.openSeaSales as T_OpenSeaSale[];

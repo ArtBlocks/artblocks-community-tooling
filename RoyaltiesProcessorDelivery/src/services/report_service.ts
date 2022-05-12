@@ -75,7 +75,7 @@ export class ReportService {
 
   getBlocksHeader(blockRange: [number, number]): string {
     const sep = this.#csvSeparator;
-    const reportBlockRangeHeader = `Lower bound block${sep}Higher bound block\n`;
+    const reportBlockRangeHeader = `Lower bound block (included)${sep}Higher bound block (excluded)\n`;
     const reportBlockRangeData = `${blockRange[0]}${sep}${blockRange[1]}\n`;
     const spaceAfterHeader = `${sep}\n${sep}\n${sep}\n`;
     return reportBlockRangeHeader + reportBlockRangeData + spaceAfterHeader;

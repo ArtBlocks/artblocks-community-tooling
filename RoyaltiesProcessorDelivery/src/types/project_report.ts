@@ -48,33 +48,37 @@ export class ProjectReport {
     }
 
     addSale(openSeaSale: T_OpenSeaSale, nbTokensSold: number) {
-        this.#totalSales += 1;
+      this.#totalSales += 1;
 
-        // The price is divided between the number of tokens in the sale
-        // TODO!: The subgraph only register AB tokens in for Bundle. If the bundle contains other NFTs
-        //!       the price will not be split correctly (i.e only split in 2 whereas there are 5
-        //!       NFTs sold in the bundle)
-        //!       But this edges case is extremely rare
-        //!       (This is noted as an assumption in readme)
-        const priceAttributedToProject = BigNumber.from(openSeaSale.price).div(nbTokensSold);
-        const paymentToken = openSeaSale.paymentToken;
+      // The price is divided between the number of tokens in the sale
+      //      : The subgraph only register AB tokens in for Bundle. If the bundle contains other NFTs
+      //!       royalties aren't collected anyway, so they (TODO: will) already filtered out before here.
+      //!       But this edges case is extremely rare
+      //!       (This is noted as an assumption in readme)
+      const priceAttributedToProject = BigNumber.from(openSeaSale.price).div(
+        nbTokensSold
+      );
+      const paymentToken = openSeaSale.paymentToken;
 
-        // Convert the payment token to human readable name 
-        const cryptoName = addressToPaymentToken(paymentToken);
+      // Convert the payment token to human readable name
+      const cryptoName = addressToPaymentToken(paymentToken);
 
-        let volume = this.#paymentTokenVolumes.get(cryptoName);
-        if (volume === undefined) {
-            volume = {
-                total: BigNumber.from(0),
-                "V1": BigNumber.from(0),
-                "V2": BigNumber.from(0),
-            };
-        }
+      let volume = this.#paymentTokenVolumes.get(cryptoName);
+      if (volume === undefined) {
+        volume = {
+          total: BigNumber.from(0),
+          V1: BigNumber.from(0),
+          V2: BigNumber.from(0),
+          Vunknown: BigNumber.from(0), // when using OS API, version is unknown
+        };
+      }
 
-        volume.total = volume.total.add(priceAttributedToProject);
-        volume[openSeaSale.saleVersion] = volume[openSeaSale.saleVersion].add(priceAttributedToProject);
+      volume.total = volume.total.add(priceAttributedToProject);
+      volume[openSeaSale.openSeaVersion] = volume[
+        openSeaSale.openSeaVersion
+      ].add(priceAttributedToProject);
 
-        this.#paymentTokenVolumes.set(cryptoName, volume);
+      this.#paymentTokenVolumes.set(cryptoName, volume);
     }
 
     public get projectId(): number {
