@@ -285,7 +285,12 @@ export async function getOpenSeaSalesEvents(
       // only include if new sale's block is >= minBlock
       if (newOpenSeaSales[i].blockNumber >= minBlockNumber) {
         openSeaSales.push(newOpenSeaSales[i]);
+      } else if (newOpenSeaSales[i].blockNumber === null) {
+        // have observed OS API return this for failed transactions
+        // sale did not occur (even though a successful event), so just skip
+        console.debug(`[DEBUG] Skipped failed tx with null block number on collection ${collectionSlug}`)
       } else {
+        // valid block number less than min block number, break out of scrolling
         _reachedMinBlockNumber = true;
       }
     }
