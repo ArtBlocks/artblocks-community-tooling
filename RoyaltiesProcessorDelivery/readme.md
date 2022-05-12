@@ -102,7 +102,7 @@ Until properly handled, these assumptions may result in incorrect payment estima
 **Overestimates Artist Payments**:
   - *no known bugs at this time*
 
-*-When using OpenSea API mode, there are no known bugs at this time*
+>When using OpenSea API mode, there are no known bugs at this time. If you discover a new previously unknown bug when using OpenSea API mode, please file a bug in this project's public GitHub repository: https://github.com/ArtBlocks/artblocks-community-tooling/issues
 # Dependencies
 
 The scripts in this project depend on Art Blocks public hosted subgraph. This can be found at https://thegraph.com/hosted-service/subgraph/artblocks/art-blocks.
