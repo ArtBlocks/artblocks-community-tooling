@@ -113,6 +113,7 @@ async function processSales(
   blockRange: [number, number],
   openseaSalesFilter: OpenSeaSalesFilter,
   useOpenSeaApi: boolean,
+  pbabInvoice: boolean,
   csvOutputFilePath?: string
 ) {
   // apply special cases based on desired filter
@@ -274,7 +275,7 @@ async function processSales(
   if (excludedTokensOnFlagship > 0) {
     console.info(
       `[INFO] Excluded ${excludedTokensOnFlagship} ` +
-        `individual token sales on flagship in ProjectIds: ${projectIdsToExclude}`
+        `individual token sales on flagship in projectIds: ${projectIdsToExclude}`
     );
   }
 
@@ -325,6 +326,18 @@ async function processSales(
     openSeaSaleService.generateProjectReports(openSeaSales);
 
   if (csvOutputFilePath !== undefined) {
+    if (pbabInvoice) {
+      reportService.generatePBABInvoiceCSVFromProjectReports(
+        blockRange,
+        Array.from(projectReports.values()),
+        csvOutputFilePath.replace(
+          ".csv",
+          `_pbab_invoice_${contractsFilter!.toString()}.csv`
+        ),
+        contractsFilter!.toString()
+      );
+      return;
+    }
     const csvRawOutputFilePath = csvOutputFilePath.replace(".csv", "_raw.csv");
     const csvDetailedOutputFilePath = csvOutputFilePath.replace(
       ".csv",
@@ -345,13 +358,13 @@ async function processSales(
       Array.from(projectReports.values()),
       csvRawOutputFilePath
     );
-  } else {
-    // Print output to console
-    reportService.outputReportToConsole(
-      blockRange,
-      Array.from(projectReports.values())
-    );
+    return;
   }
+  // Print output to console
+  reportService.outputReportToConsole(
+    blockRange,
+    Array.from(projectReports.values())
+  );
 }
 
 yargs(hideBin(process.argv))
@@ -410,6 +423,13 @@ yargs(hideBin(process.argv))
             "If present, the OpenSea api will be used instead of the subgraph. requires either: --flagship OR --contract.",
           type: "boolean",
           conflicts: ["collection", "PBAB"],
+        })
+        .option("pbabInvoice", {
+          description:
+            "Generates a PBAB invoice summary report. Requires a single PBAB core contract arg.",
+          type: "boolean",
+          conflicts: ["flagship", "PBAB", "collection"],
+          implies: ["contract", "csv"],
         });
     },
     async (argv) => {
@@ -431,16 +451,11 @@ yargs(hideBin(process.argv))
       // can be specified at a time
       const flagship = argv.flagship as boolean | undefined;
       const pbab = argv.PBAB as boolean | undefined;
-      if (useOpenSeaApi && !flagship) {
-        console.error(
-          "[ERROR] OpenSea API mode currently only supports --flagship"
-        );
-        throw "invalid configuration";
-      }
+      const pbabInvoice = argv.pbabInvoice as boolean | undefined;
       let contract = argv.contract as string | undefined;
-      if (useOpenSeaApi && !flagship) {
+      if (useOpenSeaApi && !flagship && !contract) {
         console.error(
-          "[ERROR] OpenSea API mode currently does not support single contract mode"
+          "[ERROR] OpenSea API mode currently only supports --flagship or --contract mode"
         );
         throw "invalid configuration";
       }
@@ -486,6 +501,7 @@ yargs(hideBin(process.argv))
         [startingBlock, endingBlock],
         openSeaSalesFilter,
         !!useOpenSeaApi,
+        !!pbabInvoice,
         outputPath
       );
     }
