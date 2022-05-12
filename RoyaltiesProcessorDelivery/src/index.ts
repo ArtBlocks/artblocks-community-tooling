@@ -15,6 +15,7 @@ import { OpenSeaSalesService } from "./services/opensea_sales_service";
 import { T_OpenSeaSale } from "./types/graphQL_entities_def";
 import { exit } from "process";
 import { TokenZeroRepository } from "./repositories/token_zero_repository";
+import { getOpenSeaAssetCollectionSlug } from "./repositories/opensea_api";
 
 // Instanciate datasources, repositories and services
 const graphQLDatasource = new GraphQLDatasource(URL_GRAPHQL_ENDPOINT);
@@ -83,6 +84,52 @@ async function processSales(
 
   console.info(`[INFO] ${openSeaSales.length} OpenSea sales have been fetched`);
 
+  // filter out all subgraph bundles with > 1 OpenSea collection slug
+  // (in series to slow down because OpenSea API is rate limited)
+  console.info(
+    "[INFO] Getting OpenSea collection slugs for tokens in bundle sales... (cached upon receipt)"
+  );
+  let bundleSalesWithMultipleCollectionSlugs = 0;
+  if (!useOpenSeaApi) {
+    const filteredOpenSeaSales: T_OpenSeaSale[] = [];
+    for (let i = 0; i < openSeaSales.length; i++) {
+      const _openSeaSale = openSeaSales[i];
+      const summaryTokensSold = _openSeaSale.summaryTokensSold.split("::");
+      if (summaryTokensSold.length == 1) {
+        // single sale, keep
+        filteredOpenSeaSales.push(_openSeaSale);
+      } else {
+        // bundle sale
+        const contractsAndTokenIds = summaryTokensSold.map((_id) => {
+          return _id.split("-");
+        });
+        // get OpenSea collection slug for each token in sale
+        const collectionSlugs: string[] = [];
+        for (let j = 0; j < contractsAndTokenIds.length; j++) {
+          const _collectionSlug = await getOpenSeaAssetCollectionSlug(
+            contractsAndTokenIds[j][0],
+            contractsAndTokenIds[j][1]
+          );
+          collectionSlugs.push(_collectionSlug);
+        }
+        // add as sale w/royalties only if all collection slugs are same
+        if (
+          collectionSlugs.every((_slug, _, _slugs) => {
+            return _slug === _slugs[0];
+          })
+        ) {
+          filteredOpenSeaSales.push(_openSeaSale);
+        } else {
+          bundleSalesWithMultipleCollectionSlugs++;
+        }
+      }
+    }
+    openSeaSales = filteredOpenSeaSales;
+  }
+  console.info(
+    `[INFO] Removed ${bundleSalesWithMultipleCollectionSlugs} Bundle OS sales with tokens from >1 OpenSea Collection Slug.`
+  );
+
   const collectionFilter = openseaSalesFilter.collectionFilter;
   const contractFilterType = openseaSalesFilter.contractFilterType;
   const contractsFilter = openseaSalesFilter.contractsFilter;
@@ -91,11 +138,12 @@ async function processSales(
   let skippedOtherContractsTokens = 0;
   let skippedCurationStatus = 0;
 
-  // Among all sales, filter those we are interested in.
-  // Filter the OpenSeaSales that match the given OpenSeaSalesFilter
-  // WARNING: It will modify IN PLACE the openSeaSale.openSeaSaleLookupTables list to remove any OpenSeaSaleLookupTable
-  //          that did not match the filter. If for a given openSeaSale, there was no OpenSeaSaleLookupTable (several
-  //          for unble sale) that passed the filter, the openSeaSale is filtered.
+  /* Among all sales, filter those we are interested in.
+   * Filter the OpenSeaSales that match the given OpenSeaSalesFilter
+   * Modifies IN PLACE the openSeaSale.openSeaSaleLookupTables list to remove any OpenSeaSaleLookupTable
+   * that did not match the filter. If for a given openSeaSale, there was no OpenSeaSaleLookupTable (several
+   * for bundle sale) that passed the filter, the openSeaSale is filtered.
+   */
   openSeaSales = openSeaSales.filter((openSeaSale: T_OpenSeaSale) => {
     const openSeaSaleLookupTables = openSeaSale.openSeaSaleLookupTables;
 

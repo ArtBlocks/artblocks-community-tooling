@@ -73,6 +73,8 @@ The inspect command lets you inspect all the sales made on OpenSea for a given p
 # Assumptions
 **IMPORTANT FOR ALL USERS TO BE AWARE OF THESE - CURRENT SET OF ASSUMPTIONS ARE INVALID FOR SOME EDGE-CASE OPENSEA SALES**
 
+*This script's logic is behind the state of Royalties Processor Delivery, and could handle edge-cases better if updated*
+
 Until properly handled, these assumptions may result in incorrect royalty estimates.
 
 - Assumes all artists always have a 5% royalty

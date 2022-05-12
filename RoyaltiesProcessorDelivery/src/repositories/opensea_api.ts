@@ -10,11 +10,15 @@ import fetch, { Headers } from "node-fetch";
 
 require("dotenv").config();
 
-const OPENSEA_API_KEY = process.env.OPENSEA_API_KEY;
-const MAX_RETRIES = 15;
+const flatCache = require("flat-cache");
 
-// returns the OpenSea asset's collection slug as a string
-export async function getOpenSeaAssetCollectionSlug(
+const tokenSlugCache = flatCache.load("tokenSlugCache", ".slug_cache");
+
+const OPENSEA_API_KEY = process.env.OPENSEA_API_KEY;
+const MAX_RETRIES = 100;
+
+// helper function, throws upon api failure
+async function _getOpenSeaAssetCollectionSlug(
   contractAddress: string,
   tokenId: string
 ): Promise<string> {
@@ -26,6 +30,54 @@ export async function getOpenSeaAssetCollectionSlug(
     "X-API-KEY": OPENSEA_API_KEY,
   });
   return res.assets[0].collection.slug;
+}
+
+// returns the OpenSea asset's collection slug as a string
+export async function getOpenSeaAssetCollectionSlug(
+  contractAddress: string,
+  tokenId: string
+): Promise<string> {
+  const cacheKey = `${contractAddress}-${tokenId}`;
+  let cachedCollectionSlug = tokenSlugCache.getKey(cacheKey);
+  if (cachedCollectionSlug !== undefined) {
+    // use cached collection slug
+    return cachedCollectionSlug;
+  }
+  // Use OpenSea API, save to cache
+  let retries = 0;
+  let openSeaCollectionSlug: string;
+  while (true) {
+    try {
+      openSeaCollectionSlug = await _getOpenSeaAssetCollectionSlug(
+        contractAddress,
+        tokenId
+      );
+      // always throttle to avoid rate errors
+      await delay(500);
+      break;
+    } catch (error) {
+      if (retries++ >= MAX_RETRIES) {
+        console.error(error);
+        console.error(
+          `[ERROR] Exiting due to repeated error when getting collection slug for asset ${contractAddress}-${tokenId}`
+        );
+        throw "Exiting due to repeated api failure";
+      }
+      // likely too many requests, cool off for ten seconds
+      console.warn(
+        `[WARN] API error when getting collection slug for asset ${contractAddress}-${tokenId}`
+      );
+      console.warn(
+        "[WARN] likely too many requests... cooling off for 5 seconds"
+      );
+      await delay(5000);
+      console.debug(`[INFO] retry ${retries} of ${MAX_RETRIES}...`);
+    }
+  }
+  // add slug to cache, save
+  tokenSlugCache.setKey(cacheKey, openSeaCollectionSlug);
+  tokenSlugCache.save(true);
+  return openSeaCollectionSlug;
 }
 
 function openSeaEventModelToSubgraphModel(
