@@ -172,7 +172,7 @@ function openSeaEventModelToSubgraphModel(
           } else {
             // Unexpected behavior
             console.error(
-              `[ERROR] Univorm Bundle sale containing tokens from different collection encountered. Unexpected response from OpenSea API.`
+              `[ERROR] Uniform Bundle sale containing tokens from different collection encountered. Unexpected response from OpenSea API.`
             );
             console.warn(
               `[ERROR] Sale tx hash: ${_event.transaction.transaction_hash}`

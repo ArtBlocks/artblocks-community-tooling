@@ -34,7 +34,8 @@ yarn start range 13960989 13995989 --flagship --csv
 ```
 where:
 - `--flagship` indicates PBAB tokens should be excluded
-- `13995989` is the ethereum mainnet block to end searching for sales (inclusive)
+- `13960989` is the ethereum mainnet block to begin searching for sales (inclusive)
+- `13995989` is the ethereum mainnet block to end searching for sales (exclusive)
 - `--csv` means the script should generate a report in the form of a csv file
 
 If only curated projects are desired:

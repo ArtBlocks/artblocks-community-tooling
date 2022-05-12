@@ -254,7 +254,6 @@ export class OpenSeaSalesService {
     }
     // OS api works in terms of timestamps, not blocks.
     let maxTimestamp = await getBlockTimestamp(blockRange[1]);
-    maxTimestamp += 1; // inclusive of block range
 
     // retrieve all events in timestamp/block range, for each collection
     // populate openSeaSales along the way!
