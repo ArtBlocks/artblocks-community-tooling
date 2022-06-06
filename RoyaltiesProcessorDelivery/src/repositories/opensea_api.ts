@@ -197,6 +197,22 @@ function openSeaEventModelToSubgraphModel(
      */
 
     // complete conversion to subgraph T_OpenSeaSale model
+    try {
+      if (_event.payment_token === null) {
+        console.warn(
+          "[WARN] Payment token is NULL from OpenSea's api. " +
+            "This has been observed at least once, and assumption that payment " +
+            "token was ETH was valid. Assuming ETH is payment token, but " +
+            "recommend validating on etherscan."
+        );
+        console.warn(
+          `[WARN] The relavent tx for msg above is: ${_event.transaction.transaction_hash}`
+        );
+        // assign payment token to ETH
+        _event.payment_token = {
+          address: "0x0000000000000000000000000000000000000000",
+        };
+      }
     const _sale: T_OpenSeaSale = {
       id: _event.id,
       openSeaVersion: "Vunknown",
@@ -212,6 +228,12 @@ function openSeaEventModelToSubgraphModel(
       openSeaSaleLookupTables: _openSeaLookupTables,
     };
     return _sale;
+  } catch (e) {
+    console.error("[ERROR] Error in OpenSeaSaleConverter");
+    console.error(_event)
+    console.error(_event.payment_token)
+    throw(e)
+  }
   });
 }
 
