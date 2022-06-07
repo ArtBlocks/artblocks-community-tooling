@@ -1,13 +1,13 @@
 import { gql } from "graphql-request"
 
 import { GraphQLDatasource } from "../datasources/graphQL_datasource";
-import { T_OpenSeaSale } from "../types/graphQL_entities_def";
+import { T_Sale } from "../types/graphQL_entities_def";
 
-const QUERY_GET_OPENSEA_SALES = gql`
-query getOpenSeaSales($first: Int!, $skip: Int!) {
-  openSeaSales(first: $first, skip: $skip, where: {WHERE_CLAUSE}, orderBy: blockNumber, orderDirection: desc) {
+const QUERY_GET_SALES = gql`
+query getSales($first: Int!, $skip: Int!) {
+  sales(first: $first, skip: $skip, where: {WHERE_CLAUSE}, orderBy: blockNumber, orderDirection: desc) {
     id
-    openSeaVersion
+    exchange
     saleType
     price
     paymentToken
@@ -15,7 +15,7 @@ query getOpenSeaSales($first: Int!, $skip: Int!) {
     blockTimestamp
     isPrivate
     summaryTokensSold
-    openSeaSaleLookupTables {
+    saleLookupTables {
       id
       token {
         id
@@ -35,12 +35,12 @@ query getOpenSeaSales($first: Int!, $skip: Int!) {
   }
 }`;
 
-type T_QueryVariable_GetOpenSeaSales = {
+type T_QueryVariable_GetSales = {
   first: number;
   skip: number;
 };
 
-export class OpenseaSalesRepository {
+export class SalesRepository {
   #graphQLDatasource: GraphQLDatasource;
 
   constructor(graphQLDatasource: GraphQLDatasource) {
@@ -48,16 +48,16 @@ export class OpenseaSalesRepository {
   }
 
   async getSalesBetweenBlockNumbers(
-    variables: T_QueryVariable_GetOpenSeaSales,
+    variables: T_QueryVariable_GetSales,
     blockNumberGte: number,
     blockNumberLt: number
-  ): Promise<T_OpenSeaSale[]> {
-    const query = QUERY_GET_OPENSEA_SALES.replace(
+  ): Promise<T_Sale[]> {
+    const query = QUERY_GET_SALES.replace(
       "WHERE_CLAUSE",
       `blockNumber_gte: ${blockNumberGte}, blockNumber_lt: ${blockNumberLt}`
     );
 
     const resp = await this.#graphQLDatasource.query(query, variables);
-    return resp.openSeaSales as T_OpenSeaSale[];
+    return resp.sales as T_Sale[];
   }
 }

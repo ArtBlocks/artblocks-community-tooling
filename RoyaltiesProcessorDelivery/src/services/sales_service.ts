@@ -5,15 +5,14 @@ import {
 import fetch from "node-fetch";
 
 import { delay, findCommonElements } from "../utils/util_functions";
-import { OpenseaSalesRepository } from "../repositories/opensea_sales_repository";
+import { SalesRepository } from "../repositories/sales_repository";
 import { TokenZeroRepository } from "../repositories/token_zero_repository";
 import {
   getOpenSeaAssetCollectionSlug,
   getOpenSeaSalesEvents,
 } from "../repositories/opensea_api";
-import { T_OpenSeaSale, T_TokenZero } from "../types/graphQL_entities_def";
+import { T_Sale, T_TokenZero } from "../types/graphQL_entities_def";
 import { ProjectReport } from "../types/project_report";
-import { UniqueDirectiveNamesRule } from "graphql";
 
 const flatCache = require("flat-cache");
 const collectionSlugCache = flatCache.load(
@@ -58,19 +57,19 @@ async function getBlockTimestamp(blockNumber) {
   return parseInt(data.result.timeStamp);
 }
 
-export class OpenSeaSalesService {
-  #openSeaSaleRepository: OpenseaSalesRepository;
+export class SalesService {
+  #saleRepository: SalesRepository;
   #tokenZeroRepository: TokenZeroRepository;
 
   constructor(
-    openSeaSaleRepository: OpenseaSalesRepository,
+    saleRepository: SalesRepository,
     tokenZeroRepository: TokenZeroRepository
   ) {
-    this.#openSeaSaleRepository = openSeaSaleRepository;
+    this.#saleRepository = saleRepository;
     this.#tokenZeroRepository = tokenZeroRepository;
   }
 
-  static saleHasRoyalties(sale: T_OpenSeaSale) {
+  static saleHasRoyalties(sale: T_Sale) {
     // OpenSea's API sometimes labels is_private as null when it appears to be true,
     // so treat null as true for our filter to be accurate.
     if (sale.isPrivate === null) {
@@ -85,18 +84,18 @@ export class OpenSeaSalesService {
 
   async getAllSalesBetweenBlockNumbers(
     blockRange: [number, number]
-  ): Promise<T_OpenSeaSale[]> {
+  ): Promise<T_Sale[]> {
     const first = 1000;
-    let openSeaSales: T_OpenSeaSale[] = [];
+    let sales: T_Sale[] = [];
     let [blockNumberGte, blockNumberLt] = blockRange;
 
     while (true) {
       console.log(
         `Fetching last ${first} sales from subgraph for block range: ` +
-          `[${blockNumberGte}; ${blockNumberLt}[`
+        `[${blockNumberGte}; ${blockNumberLt}[`
       );
       const newSales =
-        await this.#openSeaSaleRepository.getSalesBetweenBlockNumbers(
+        await this.#saleRepository.getSalesBetweenBlockNumbers(
           { first, skip: 0 },
           blockNumberGte,
           blockNumberLt
@@ -104,7 +103,7 @@ export class OpenSeaSalesService {
 
       if (newSales.length < first) {
         // found all remaining sales, no scroll required
-        openSeaSales.push(...newSales);
+        sales.push(...newSales);
         break;
       }
 
@@ -138,11 +137,11 @@ export class OpenSeaSalesService {
         }
       }
 
-      openSeaSales.push(...newSales);
+      sales.push(...newSales);
     }
     console.log("");
 
-    return openSeaSales;
+    return sales;
   }
 
   /**
@@ -158,10 +157,10 @@ export class OpenSeaSalesService {
     blockRange: [number, number],
     contracts: string[],
     projectIdsToAdd: string[]
-  ): Promise<T_OpenSeaSale[]> {
+  ): Promise<T_Sale[]> {
     const first = 1000;
-    // the thing we are retuning: openSeaSales array
-    let openSeaSales: T_OpenSeaSale[] = [];
+    // the thing we are retuning: sales array
+    let openSeaSales: T_Sale[] = [];
     // get token zeros for every project of interest
     let tokenZeros: T_TokenZero[] = [];
 
@@ -275,27 +274,27 @@ export class OpenSeaSalesService {
   }
 
   generateProjectReports(
-    openSeaSales: T_OpenSeaSale[]
+    sales: T_Sale[]
   ): Map<string, ProjectReport> {
     const projectReports = new Map<string, ProjectReport>();
 
     // Browse all sales
-    for (const openSeaSale of openSeaSales) {
-      const openSeaSaleLookupTables = openSeaSale.openSeaSaleLookupTables;
-      if (openSeaSaleLookupTables.length === 0) {
+    for (const sale of sales) {
+      const saleLookupTables = sale.saleLookupTables;
+      if (saleLookupTables.length === 0) {
         console.info("[found open sea sale with length of zero!]");
       }
 
       // In the pre-filtering stage we might have removed some so we can't
-      // get the  number from the openSeaSaleLookupTables list length
-      const nbTokensSold = openSeaSale.summaryTokensSold.split("::").length;
+      // get the  number from the saleLookupTables list length
+      const nbTokensSold = sale.summaryTokensSold.split("::").length;
 
       // Browse the list of tokens sold in this sale
       // May be only one in the case of a "Single" sale
       // May be several in the case of a "Bundle" sale
       // In the case of "Bundle" sale only AB tokens are registered by the AB subgraph
-      for (const tokenOpenSeaSaleLookupTable of openSeaSaleLookupTables) {
-        const token = tokenOpenSeaSaleLookupTable.token;
+      for (const tokenSaleLookupTable of saleLookupTables) {
+        const token = tokenSaleLookupTable.token;
         const project = token.project;
 
         // Get/Instanciate the projectReport
@@ -310,7 +309,7 @@ export class OpenSeaSalesService {
           );
         }
 
-        projectReport.addSale(openSeaSale, nbTokensSold);
+        projectReport.addSale(sale, nbTokensSold);
         projectReports.set(project.name, projectReport);
       }
     }

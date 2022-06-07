@@ -10,10 +10,10 @@ import {
 } from "./constant";
 import { arraysEqual } from "./utils/util_functions";
 import { GraphQLDatasource } from "./datasources/graphQL_datasource";
-import { OpenseaSalesRepository } from "./repositories/opensea_sales_repository";
+import { SalesRepository } from "./repositories/sales_repository";
 import { ReportService } from "./services/report_service";
-import { OpenSeaSalesService } from "./services/opensea_sales_service";
-import { T_OpenSeaSale } from "./types/graphQL_entities_def";
+import { SalesService } from "./services/sales_service";
+import { T_Sale } from "./types/graphQL_entities_def";
 import { exit } from "process";
 import { TokenZeroRepository } from "./repositories/token_zero_repository";
 import { getOpenSeaAssetCollectionSlug } from "./repositories/opensea_api";
@@ -23,19 +23,21 @@ import { default as pbabProjectsOnFlagshipConfig } from "../config/pbabProjectsO
 
 // Instanciate datasources, repositories and services
 const graphQLDatasource = new GraphQLDatasource(URL_GRAPHQL_ENDPOINT);
-const openSeaSalesRepository = new OpenseaSalesRepository(graphQLDatasource);
+const salesRepository = new SalesRepository(graphQLDatasource);
 const tokenZeroRepository = new TokenZeroRepository(graphQLDatasource);
-const openSeaSaleService = new OpenSeaSalesService(
-  openSeaSalesRepository,
+const saleService = new SalesService(
+  salesRepository,
   tokenZeroRepository
 );
 
 type Collection = "curated" | "playground" | "factory";
+type Exchange = "OS_V1" | "OS_V2" | "OS" | "LR_V1";
 
-type OpenSeaSalesFilter = {
+type SalesFilter = {
   collectionFilter?: Collection;
   contractFilterType?: "ONLY" | "ONLY_NOT";
   contractsFilter?: string[];
+  exchangeFilter?: Exchange;
 };
 
 const reportService = new ReportService();
@@ -69,9 +71,9 @@ async function getCurrentBlockNumber() {
  * Returns two arrays - projectIds to include, and projectIds to exclude, where
  * projectIds are in same format as Project entity id in our subgraph.
  */
-function getProjectIdsToExcludeAndAdd(openseaSalesFilter: OpenSeaSalesFilter) {
-  const contractFilterType = openseaSalesFilter.contractFilterType;
-  const contractsFilter = openseaSalesFilter.contractsFilter;
+function getProjectIdsToExcludeAndAdd(salesFilter: SalesFilter) {
+  const contractFilterType = salesFilter.contractFilterType;
+  const contractsFilter = salesFilter.contractsFilter;
   // if flagship, exclude all pbab projects on flagship
   const projectIdsToExclude: string[] = [];
   if (
@@ -88,7 +90,7 @@ function getProjectIdsToExcludeAndAdd(openseaSalesFilter: OpenSeaSalesFilter) {
   // tree under that pbab project
   const projectIdsToAdd: string[] = [];
   if (
-    contractsFilter!.length === 1 &&
+    contractsFilter?.length === 1 &&
     !AB_FLAGSHIP_CONTRACTS.includes(contractsFilter![0])
   ) {
     // For each item in config, if pbab contract is contract being filtered to,
@@ -111,7 +113,7 @@ function getProjectIdsToExcludeAndAdd(openseaSalesFilter: OpenSeaSalesFilter) {
  */
 async function processSales(
   blockRange: [number, number],
-  openseaSalesFilter: OpenSeaSalesFilter,
+  salesFilter: SalesFilter,
   useOpenSeaApi: boolean,
   pbabInvoice: boolean,
   csvOutputFilePath?: string
@@ -123,50 +125,54 @@ async function processSales(
    *  - subgraph mode - nothing more; already query for every token sale by default because subgraph is fast
    */
   const { projectIdsToExclude, projectIdsToAdd } =
-    getProjectIdsToExcludeAndAdd(openseaSalesFilter);
+    getProjectIdsToExcludeAndAdd(salesFilter);
 
-  const collectionFilter = openseaSalesFilter.collectionFilter;
-  const contractFilterType = openseaSalesFilter.contractFilterType;
-  const contractsFilter = openseaSalesFilter.contractsFilter;
+  const collectionFilter = salesFilter.collectionFilter;
+  const contractFilterType = salesFilter.contractFilterType;
+  const contractsFilter = salesFilter.contractsFilter;
+  const exchangeFilter = salesFilter.exchangeFilter;
 
-  let openSeaSales: T_OpenSeaSale[];
+  let sales: T_Sale[];
   if (!useOpenSeaApi) {
     // get all sales of all tokens in blockrange in subgraph from subgraph
-    openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbers(
+    sales = await saleService.getAllSalesBetweenBlockNumbers(
       blockRange
     );
   } else {
     // require an ONLY filter and a contractsFilter in OS API mode
     if (
-      openseaSalesFilter.contractFilterType !== "ONLY" ||
-      openseaSalesFilter.contractsFilter === undefined
+      salesFilter.contractFilterType !== "ONLY" ||
+      salesFilter.contractsFilter === undefined
     ) {
       throw "ONLY filter for subset of contracts is required when using OpenSea API mode";
     }
-    // use OpenSea api instead of our subgraph to build an openSeaSales object
-    openSeaSales = await openSeaSaleService.getAllSalesBetweenBlockNumbersOsApi(
+    // use OpenSea api instead of our subgraph to build an sales object
+    sales = await saleService.getAllSalesBetweenBlockNumbersOsApi(
       blockRange,
-      openseaSalesFilter.contractsFilter,
+      salesFilter.contractsFilter,
       projectIdsToAdd
     );
   }
 
-  console.info(`[INFO] ${openSeaSales.length} OpenSea sales have been fetched`);
+  console.info(`[INFO] ${sales.length} sales have been fetched`);
 
   // filter out all subgraph bundles with > 1 OpenSea collection slug
   // (in series to slow down because OpenSea API is rate limited)
   console.info(
-    "[INFO] Getting OpenSea collection slugs for tokens in bundle sales... (cached upon receipt)"
+    "[INFO] Getting collection slugs for tokens in bundle sales... (cached upon receipt)"
   );
   let bundleSalesWithMultipleCollectionSlugs = 0;
   if (!useOpenSeaApi) {
-    const filteredOpenSeaSales: T_OpenSeaSale[] = [];
-    for (let i = 0; i < openSeaSales.length; i++) {
-      const _openSeaSale = openSeaSales[i];
-      const summaryTokensSold = _openSeaSale.summaryTokensSold.split("::");
+    const filteredSales: T_Sale[] = [];
+    for (let i = 0; i < sales.length; i++) {
+      const _sales = sales[i];
+      if (_sales.exchange === "LR_V1") {
+        continue;
+      }
+      const summaryTokensSold = _sales.summaryTokensSold.split("::");
       if (summaryTokensSold.length == 1) {
         // single sale, keep
-        filteredOpenSeaSales.push(_openSeaSale);
+        filteredSales.push(_sales);
       } else {
         // bundle sale
         const contractsAndTokenIds = summaryTokensSold.map((_id) => {
@@ -187,13 +193,13 @@ async function processSales(
             return _slug === _slugs[0];
           })
         ) {
-          filteredOpenSeaSales.push(_openSeaSale);
+          filteredSales.push(_sales);
         } else {
           bundleSalesWithMultipleCollectionSlugs++;
         }
       }
     }
-    openSeaSales = filteredOpenSeaSales;
+    sales = filteredSales;
   }
   console.info(
     `[INFO] Removed ${bundleSalesWithMultipleCollectionSlugs} Bundle OS sales with tokens from >1 OpenSea Collection Slug.`
@@ -206,24 +212,25 @@ async function processSales(
   let excludedTokensOnFlagship = 0;
 
   /* Among all sales, filter those we are interested in.
-   * Filter the OpenSeaSales that match the given OpenSeaSalesFilter
-   * Modifies IN PLACE the openSeaSale.openSeaSaleLookupTables list to remove any OpenSeaSaleLookupTable
-   * that did not match the filter. If for a given openSeaSale, there was no OpenSeaSaleLookupTable (several
-   * for bundle sale) that passed the filter, the openSeaSale is filtered.
+   * Filter the sales that match the given SalesFilter
+   * Modifies IN PLACE the sale.saleLookupTables list to remove any saleLookupTable
+   * that did not match the filter. If for a given sale, there was no SaleLookupTable (several
+   * for bundle sale) that passed the filter, the sale is filtered.
    */
-  openSeaSales = openSeaSales.filter((openSeaSale: T_OpenSeaSale) => {
-    const openSeaSaleLookupTables = openSeaSale.openSeaSaleLookupTables;
+  sales = sales.filter((sale: T_Sale) => {
+    const saleLookupTable = sale.saleLookupTables;
 
     let nbTokenSold = 0;
-    let filteredOpenSeaSaleLookupTables = openSeaSaleLookupTables.filter(
-      (openSeaSaleLookupTable) => {
+    let filteredSaleLookupTables = saleLookupTable.filter(
+      (saleLookupTable) => {
         nbTokenSold += 1;
 
         if (nbTokenSold > 1) {
           additionalSalesFoundInBundledSales += 1;
         }
 
-        const token = openSeaSaleLookupTable.token;
+        const token = saleLookupTable.token;
+        const exchange = sale.exchange;
 
         // special case: projectId in projectIdsToAdd
         if (projectIdsToAdd.includes(token.project.id)) {
@@ -241,6 +248,11 @@ async function processSales(
           collectionFilter == undefined ||
           token.project.curationStatus === collectionFilter;
 
+        const exchangeFilterPass =
+          exchangeFilter === undefined ||
+          exchangeFilter === "OS" && exchange.startsWith("OS_V") ||
+          exchangeFilter === exchange;
+
         const contractsFilterPass =
           contractFilterType === undefined ||
           (contractFilterType == "ONLY" &&
@@ -254,20 +266,20 @@ async function processSales(
           skippedOtherContractsTokens += 1;
         }
 
-        return curationFilterPass && contractsFilterPass;
+        return curationFilterPass && contractsFilterPass && exchangeFilterPass;
       }
     );
 
-    // Replace the openSeaSaleLookupTables by the filteredOpenSeaSaleLookupTables
-    openSeaSale.openSeaSaleLookupTables = filteredOpenSeaSaleLookupTables;
-    return openSeaSale.openSeaSaleLookupTables.length > 0;
+    // Replace the saleLookupTable by the filteredSaleLookupTable
+    sale.saleLookupTables = filteredSaleLookupTables;
+    return sale.saleLookupTables.length > 0;
   });
 
   // report any tokens added on flagship
   if (addedTokensOnFlagship > 0) {
     console.info(
       `[INFO] Added ${addedTokensOnFlagship} ` +
-        `individual token sales on flagship in projectIds: ${projectIdsToAdd}`
+      `individual token sales on flagship in projectIds: ${projectIdsToAdd}`
     );
   }
 
@@ -275,7 +287,7 @@ async function processSales(
   if (excludedTokensOnFlagship > 0) {
     console.info(
       `[INFO] Excluded ${excludedTokensOnFlagship} ` +
-        `individual token sales on flagship in projectIds: ${projectIdsToExclude}`
+      `individual token sales on flagship in projectIds: ${projectIdsToExclude}`
     );
   }
 
@@ -283,7 +295,7 @@ async function processSales(
   if (additionalSalesFoundInBundledSales > 0) {
     console.info(
       `[INFO] Found ${additionalSalesFoundInBundledSales} ` +
-        `additional individual token sales while un-bundling bundled sales`
+      `additional individual token sales while un-bundling bundled sales`
     );
   }
 
@@ -291,7 +303,7 @@ async function processSales(
   if (skippedCurationStatus) {
     console.info(
       `[INFO] Skipped ${skippedCurationStatus} ` +
-        `tokens not in collection ${collectionFilter}`
+      `tokens not in collection ${collectionFilter}`
     );
   }
 
@@ -299,31 +311,31 @@ async function processSales(
   if (skippedOtherContractsTokens) {
     console.info(
       `[INFO] Skipped ${skippedOtherContractsTokens} ` +
-        `tokens because of ${contractFilterType} in [${contractsFilter}]`
+      `tokens because of ${contractFilterType} in [${contractsFilter}]`
     );
   }
 
-  console.info(`[INFO] ${openSeaSales.length} OpenSea sales after filtering`);
+  console.info(`[INFO] ${sales.length} sales after filtering`);
 
   // Filter private sales
-  openSeaSales = openSeaSales.filter((sale) =>
-    OpenSeaSalesService.saleHasRoyalties(sale)
+  sales = sales.filter((sale) =>
+    SalesService.saleHasRoyalties(sale)
   );
 
   console.info(
-    `[INFO] ${openSeaSales.length} OpenSea sales remaining after filtering ` +
-      `private sales without royalties (prior to block ` +
-      `${BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES})`
+    `[INFO] ${sales.length} sales remaining after filtering ` +
+    `private sales without royalties (prior to block ` +
+    `${BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES})`
   );
 
   // if nothing found, alert and return
-  if (openSeaSales.length <= 0) {
+  if (sales.length <= 0) {
     console.info("[INFO] No sales found (nothing to process), exiting");
     return;
   }
 
   const projectReports =
-    openSeaSaleService.generateProjectReports(openSeaSales);
+    saleService.generateProjectReports(sales);
 
   if (csvOutputFilePath !== undefined) {
     if (pbabInvoice) {
@@ -371,7 +383,7 @@ yargs(hideBin(process.argv))
   .strict()
   .command(
     "range <startingBlock> [endingBlock] [collection] [flagship] [csv] [outputPath]",
-    "Process all Opensea sales after startingBlock (included) and before endingBlock (excluded)",
+    "Process all Opensea and LooksRare sales after startingBlock (included) and before endingBlock (excluded)",
     (yargs) => {
       yargs
         .positional("startingBlock", {
@@ -430,6 +442,12 @@ yargs(hideBin(process.argv))
           type: "boolean",
           conflicts: ["flagship", "PBAB", "collection"],
           implies: ["contract", "csv"],
+        })
+        .option("exchange", {
+          description:
+            "Only the sales coming from a given exchange.",
+          type: "string",
+          choices: ["OS_V1", "OS_V2", "OS", "LR_V1"],
         });
     },
     async (argv) => {
@@ -443,8 +461,10 @@ yargs(hideBin(process.argv))
       console.info("[INFO] Use OpenSea API Mode? -> ", !!useOpenSeaApi);
 
       const collection = argv.collection as Collection | undefined;
-      let openSeaSalesFilter: OpenSeaSalesFilter = {
+      const exchange = argv.exchange as Exchange | undefined;
+      let salesFilter: SalesFilter = {
         collectionFilter: collection,
+        exchangeFilter: exchange,
       };
 
       // Those 3 optional params are conflicting with each others, only one
@@ -461,15 +481,15 @@ yargs(hideBin(process.argv))
       }
 
       if (flagship) {
-        openSeaSalesFilter.contractFilterType = "ONLY";
-        openSeaSalesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS;
+        salesFilter.contractFilterType = "ONLY";
+        salesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS;
       } else if (pbab) {
-        openSeaSalesFilter.contractFilterType = "ONLY_NOT";
-        openSeaSalesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS;
+        salesFilter.contractFilterType = "ONLY_NOT";
+        salesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS;
       } else if (contract) {
         contract = contract.toLowerCase();
-        openSeaSalesFilter.contractFilterType = "ONLY";
-        openSeaSalesFilter.contractsFilter = [contract];
+        salesFilter.contractFilterType = "ONLY";
+        salesFilter.contractsFilter = [contract];
       }
 
       // ensure ending block < currentBlock via etherscan api
@@ -499,7 +519,7 @@ yargs(hideBin(process.argv))
       }
       await processSales(
         [startingBlock, endingBlock],
-        openSeaSalesFilter,
+        salesFilter,
         !!useOpenSeaApi,
         !!pbabInvoice,
         outputPath
