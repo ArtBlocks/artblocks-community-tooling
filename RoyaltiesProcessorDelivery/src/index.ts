@@ -481,6 +481,13 @@ yargs(hideBin(process.argv))
         throw "invalid configuration";
       }
 
+      if (useOpenSeaApi && exchange !== "OS") {
+        console.error(
+          "[ERROR] Exchange filter of OS is required when using OpenSea API mode"
+        );
+        throw "invalid configuration";
+      }
+
       if (flagship) {
         salesFilter.contractFilterType = "ONLY";
         salesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS;
