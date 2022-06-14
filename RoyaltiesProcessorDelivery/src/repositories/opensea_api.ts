@@ -98,9 +98,9 @@ function openSeaEventModelToSubgraphModel(
         _numTokensSold++;
       }
     }
-    // Convert token(s) to array of subgraph's T_OpenSeaSaleLookupTable model
+    // Convert token(s) to array of subgraph's T_SaleLookupTable model
     const _openSeaLookupTables: T_SaleLookupTable[] = [];
-    // populate this with same data as defined in opensea_sales_repository.ts
+    // populate this with same data as defined in sales_repository.ts
     if (_saleType === "Single") {
       // single sale
       // only push tokens that are in this TokenZero's project

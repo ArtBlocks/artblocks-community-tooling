@@ -159,7 +159,7 @@ async function processSales(
   // filter out all subgraph bundles with > 1 OpenSea collection slug
   // (in series to slow down because OpenSea API is rate limited)
   console.info(
-    "[INFO] Getting collection slugs for tokens in bundle sales... (cached upon receipt)"
+    "[INFO] Getting OpenSea collection slugs for tokens in bundle sales... (cached upon receipt)"
   );
   let bundleSalesWithMultipleCollectionSlugs = 0;
   if (!useOpenSeaApi) {
