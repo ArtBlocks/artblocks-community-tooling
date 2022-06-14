@@ -166,7 +166,8 @@ async function processSales(
     const filteredSales: T_Sale[] = [];
     for (let i = 0; i < sales.length; i++) {
       const _sales = sales[i];
-      if (_sales.exchange === "LR_V1") {
+      if (_sales.exchange !== "OS_V1" && _sales.exchange !== "OS_V2") {
+        filteredSales.push(_sales);
         continue;
       }
       const summaryTokensSold = _sales.summaryTokensSold.split("::");
