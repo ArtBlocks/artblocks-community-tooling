@@ -2,7 +2,7 @@
 
 > :warning: No guarantee of accuracy is included with this community tooling. Please verify all results when using, and be sure to understand [assumptions](#assumptions)
 
-This set of scripts helps summarize and track all sales of all Art Blocks tokens on the OpenSea marketplace.
+This set of scripts helps summarize and track all sales of all Art Blocks tokens on the OpenSea and LooksRare marketplaces.
 
 # Getting started
 
@@ -24,7 +24,7 @@ You will also need to create a `.env` file at this directory's root populated wi
 
 This tool should be ran from a command line interface.
 
-An example command to query all OpenSea royalties for Art Blocks tokens (including PBAB) between blocks `13960989` (inclusive) and `13995989` (exclusive) would be:
+An example command to query all OpenSea and LooksRare royalties for Art Blocks tokens (including PBAB) between blocks `13960989` (inclusive) and `13995989` (exclusive) would be:
 ```
 yarn start range 13960989 13995989 --csv
 ```
@@ -49,22 +49,23 @@ To query the script usage run:
 - `yarn start --help`
 
 To query a specific command, e.g. `range`, run:
-- `yarn start --help range
+- `yarn start --help range`
 
 # Available Commands
 
 ## range
-`index.ts range <startingBlock> [endingBlock] [collection] [flagship] [csv] [outputPath] [osAPI] [pbabInvoice]`
+`index.ts range <startingBlock> [endingBlock] [collection] [flagship] [csv] [outputPath] [osAPI] [pbabInvoice] [exchange]`
 
-This command processes and summarizes all OpenSea sales after `startingBlock` (included) and before `endingBlock` (excluded). Additional optional args:
+This command processes and summarizes all supported exchanges (currently OpenSea and LooksRare) sales after `startingBlock` (included) and before `endingBlock` (excluded). Additional optional args:
 - `--collection`: filter to only "curated" | "factory" | "playground"
 - `--flagship`: boolean, exclude PBAB projects
 - `--contract`: filter to only a specific core contract. Generally useful when filtering to specific PBAB contract.
 - `--csv`: boolean, output results to csv
 - `--outputPath`: set if override of default output path is desired
 - `--osAPI`: gathers sales events from OpenSea's API instead of the subgraph. This relies on OpenSea to have categorized tokens in appropriate collections, collections haven't changed between time of sale and time of query, trusts the data in OpenSea's database, etc. Note that subgraph is still used to enumerate projects on core contract. Also note that project slugs are cached by default, and may be invalidated by deleting the `./slug_cache` directory (clearing cache only required if OpenSea changes a project's collection slug).
-  >Note: Using OpenSea API mode only works with `--flagship` or `--contract`.
+  >Note: Using OpenSea API mode only works with `--flagship` or `--contract`. Also `--exchange` must to be set to "OS".
 - `--pbabInvoice`: generates a PBAB invoice detailed report, assuming 2.5% royalties to render provider. Must be filtered down to a single contract via `--contract` command.
+- `--exchange`: Specify the exchange to process the sales from. Supported exchanges are : "OS_V1" for OpenSea Wyvern V1, "OS_V2" for OpenSea Wyvern V2, "OS" for OpenSea Wyvern V1 and V2 or "LR_V1" for Looksrare.
 
 A common example of a query running this command is:
 ```
@@ -94,11 +95,12 @@ Until properly handled, these assumptions may result in incorrect payment estima
   - This is relatively unconcerning in most cases. However, clear communication and awareness must be used regarding how splits change over time.
 
 **Underestimates Artist Payments**:
+
 - (when NOT using OpenSea API mode*) Assumes only one OpenSea sale (i.e. call to `atomicMatch_`) occurs per transaction
   - This is not true in all cases, especially for arbitrage bots
     - e.g. https://etherscan.io/tx/0x128763e116ec0f0760bd64f7cbb066b67458f35317d5911a9357734463a91c4a
   - The solution to this is to update the subgraph schema to not use `tx_hash` as a primary key for the OpenSeaSale entity
-  - Current behavior of subgraph is that only the last sale to occur in a tx is recorded (overwrites all previous sales in tx)
+  - Current behavior of subgraph is that only the last sale to occur in a tx is recorded (overwrites all previous sales in tx)~~
 
 **Overestimates Artist Payments**:
   - *no known bugs at this time*
