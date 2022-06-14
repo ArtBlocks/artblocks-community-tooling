@@ -240,7 +240,7 @@ export class ReportService {
     let pbabInvoiceHeaderLineA = `Core Contract:${sep}${coreContract}${sep}`;
     let pbabInvoiceHeaderLineB = `PBAB Invoice (2.5% of total volume):${sep}${sep}`;
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
-      pbabInvoiceHeaderLineA += `${sep}${sep}${sep}${sep}${crypto}${sep}`;
+      pbabInvoiceHeaderLineA += `${sep}${sep}${sep}${sep}${sep}${crypto}${sep}`;
       let _cryptoVolume = BigNumber.from(0);
       for (const projectReport of projectReports) {
         const _volume = projectReport.paymentTokenVolumes.get(crypto);
@@ -249,7 +249,7 @@ export class ReportService {
         }
       }
       const invoiceForCurrency = _cryptoVolume.div(PBAB_ROYALTY_DENOMINATOR);
-      pbabInvoiceHeaderLineB += `${sep}${sep}${sep}${sep}${amountHumanReadable(
+      pbabInvoiceHeaderLineB += `${sep}${sep}${sep}${sep}${sep}${amountHumanReadable(
         crypto,
         invoiceForCurrency
       )}${sep}`;
