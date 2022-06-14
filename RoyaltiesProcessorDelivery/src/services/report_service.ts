@@ -79,9 +79,8 @@ export class ReportService {
     const sep = this.#csvSeparator;
     const ts = Date.now();
     let dateTime = new Date(ts);
-    return `Report Generated:${sep}${dateTime.getFullYear()}-${
-      dateTime.getMonth() + 1
-    }-${dateTime.getDate()}\n`;
+    return `Report Generated:${sep}${dateTime.getFullYear()}-${dateTime.getMonth() + 1
+      }-${dateTime.getDate()}\n`;
   }
 
   getBlocksHeader(
@@ -204,7 +203,7 @@ export class ReportService {
     // Build the global CSV header
     let projectReportHeader = `PROJECT NAME${sep}TOTAL SALES${sep}ARTIST ADDRESS${sep}ADDITIONAL ADDRESS`;
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
-      projectReportHeader += `${sep}V1 ${crypto} VOLUME${sep}V2 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`;
+      projectReportHeader += `${sep}OS_V1 ${crypto} VOLUME${sep}OS_V2 ${crypto} VOLUME${sep}LR_V1 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`;
     }
 
     let csvData = blocksHeader + projectReportHeader + "\n";
@@ -228,7 +227,7 @@ export class ReportService {
     const sep = this.#csvSeparator;
     // Disclaimers
     const disclaimers =
-      "Disclaimer: Values in this report represent our best estimate of OpenSea on-chain activity but no guarantee of accuracy is included. Report numbers were not produced by OpenSea and are subject to change as OpenSea's royalty collection processes change.\n" +
+      "Disclaimer: Values in this report represent our best estimate of OpenSea and LooksRare on-chain activity but no guarantee of accuracy is included. Report numbers were not produced by OpenSea or LooksRare and are subject to change as OpenSea's and LooksRare's royalty collection processes change.\n" +
       "Disclaimer: Informational-only Artist and Additional Payee percentages are assumed to not change through time and are assumed to total 5% (hard-coded - does not account for any on-chain updated values).\n\n";
 
     // date header
@@ -259,7 +258,7 @@ export class ReportService {
     // Build the global CSV header
     let projectReportHeader = `PROJECT NAME${sep}TOTAL SALES${sep}ARTIST ADDRESS${sep}ADDITIONAL ADDRESS`;
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
-      projectReportHeader += `${sep}V1 ${crypto} VOLUME${sep}V2 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`;
+      projectReportHeader += `${sep}OS_V1 ${crypto} VOLUME${sep}OS_V2 ${crypto} VOLUME${sep}LR_V1 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`;
     }
 
     let csvData =
@@ -295,17 +294,17 @@ export class ReportService {
     } = projectReport;
     const escapedProjectName = name.replace(sep, "");
 
-    let projectReportData = `${escapedProjectName}${sep}${totalSales}${sep}${artistAddress}${sep}${
-      additionalPayeeAddress === undefined ? "None" : additionalPayeeAddress
-    }`;
+    let projectReportData = `${escapedProjectName}${sep}${totalSales}${sep}${artistAddress}${sep}${additionalPayeeAddress === undefined ? "None" : additionalPayeeAddress
+      }`;
 
     // Loop for all possible payment token listed by Art Blocks
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
       const volume = paymentTokenVolumes.get(crypto);
 
       // If no sales was made with this payment token, record it with a 0
-      let v1VolumeReadable = "0.00000";
-      let v2VolumeReadable = "0.00000";
+      let osV1VolumeReadable = "0.00000";
+      let osV2VolumeReadable = "0.00000";
+      let looksRareVolumeReadable = "0.00000";
       let totalVolumeReadable = "0.00000";
       let amountToArtistReadable = "0.00000";
       let amountToAdditionalPayeeReadable = "0.00000";
@@ -313,8 +312,9 @@ export class ReportService {
       // Else fetch the amounts
       if (volume !== undefined) {
         const { toArtist, toAdditional } = cryptoDue.get(crypto)!;
-        v1VolumeReadable = amountHumanReadable(crypto, volume["V1"]);
-        v2VolumeReadable = amountHumanReadable(crypto, volume["V2"]);
+        osV1VolumeReadable = amountHumanReadable(crypto, volume["OS_V1"]);
+        osV2VolumeReadable = amountHumanReadable(crypto, volume["OS_V2"]);
+        looksRareVolumeReadable = amountHumanReadable(crypto, volume['LR_V1']);
         totalVolumeReadable = amountHumanReadable(crypto, volume.total);
         amountToArtistReadable = amountHumanReadable(crypto, toArtist);
         amountToAdditionalPayeeReadable =
@@ -323,7 +323,7 @@ export class ReportService {
             : "0.00000";
       }
 
-      projectReportData += `${sep}${v1VolumeReadable}${sep}${v2VolumeReadable}${sep}${totalVolumeReadable}${sep}${amountToArtistReadable}${sep}${amountToAdditionalPayeeReadable}`;
+      projectReportData += `${sep}${osV1VolumeReadable}${sep}${osV2VolumeReadable}${sep}${looksRareVolumeReadable}${sep}${totalVolumeReadable}${sep}${amountToArtistReadable}${sep}${amountToAdditionalPayeeReadable}`;
     }
 
     return projectReportData + "\n";
@@ -375,7 +375,7 @@ export class ReportService {
       }
 
       const { toArtist, toAdditional } = cryptoDue.get(crypto)!;
-      const memo = `${projectReport.name} Sold on OpenSea between blocks ${blockRange[0]} and ${blockRange[1]}`;
+      const memo = `${projectReport.name} Sold on OpenSea and LooksRare between blocks ${blockRange[0]} and ${blockRange[1]}`;
 
       // Only add the line for the artist if amount perceived is > 0
       if (toArtist.gt(0)) {

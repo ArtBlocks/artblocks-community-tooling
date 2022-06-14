@@ -1,6 +1,6 @@
 import { BigNumber } from "ethers";
 import { addressToPaymentToken } from "../utils/token_conversion";
-import { T_OpenSeaSale } from "./graphQL_entities_def";
+import { T_Sale } from "./graphQL_entities_def";
 
 export type CryptoRepartition = {
     toArtist: BigNumber,
@@ -9,8 +9,8 @@ export type CryptoRepartition = {
 
 export type PaymentTokenVolume = {
     total: BigNumber,
-    // V1 and V2 volumes
-    [osVersion: string]: BigNumber
+    // OS_V1, OS_V2 and LR_V1 volumes
+    [exchange: string]: BigNumber
 }
 
 export class ProjectReport {
@@ -47,34 +47,35 @@ export class ProjectReport {
         this.#cryptoDue = new Map();
     }
 
-    addSale(openSeaSale: T_OpenSeaSale, nbTokensSold: number) {
-      this.#totalSales += 1;
+    addSale(sale: T_Sale, nbTokensSold: number) {
+        this.#totalSales += 1;
 
-      // The price is divided equally between the number of tokens in the sale
-      const priceAttributedToProject = BigNumber.from(openSeaSale.price).div(
-        nbTokensSold
-      );
-      const paymentToken = openSeaSale.paymentToken;
+        // The price is divided equally between the number of tokens in the sale
+        const priceAttributedToProject = BigNumber.from(sale.price).div(
+            nbTokensSold
+        );
+        const paymentToken = sale.paymentToken;
 
-      // Convert the payment token to human readable name
-      const cryptoName = addressToPaymentToken(paymentToken);
+        // Convert the payment token to human readable name
+        const cryptoName = addressToPaymentToken(paymentToken);
 
-      let volume = this.#paymentTokenVolumes.get(cryptoName);
-      if (volume === undefined) {
-        volume = {
-          total: BigNumber.from(0),
-          V1: BigNumber.from(0),
-          V2: BigNumber.from(0),
-          Vunknown: BigNumber.from(0), // when using OS API, version is unknown
-        };
-      }
+        let volume = this.#paymentTokenVolumes.get(cryptoName);
+        if (volume === undefined) {
+            volume = {
+                total: BigNumber.from(0),
+                OS_V1: BigNumber.from(0),
+                OS_V2: BigNumber.from(0),
+                LR_V1: BigNumber.from(0),
+                OS_Vunknown: BigNumber.from(0), // when using OS API, version is unknown
+            };
+        }
 
-      volume.total = volume.total.add(priceAttributedToProject);
-      volume[openSeaSale.openSeaVersion] = volume[
-        openSeaSale.openSeaVersion
-      ].add(priceAttributedToProject);
+        volume.total = volume.total.add(priceAttributedToProject);
+        volume[sale.exchange] = volume[
+            sale.exchange
+        ].add(priceAttributedToProject);
 
-      this.#paymentTokenVolumes.set(cryptoName, volume);
+        this.#paymentTokenVolumes.set(cryptoName, volume);
     }
 
     public get projectId(): number {

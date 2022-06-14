@@ -1,14 +1,14 @@
 type T_Project = {
-    id: string,
-    name: string,
-    artistAddress: string,
-    curationStatus: "curated" | "playground" | "factory",
-    additionalPayee: string | null,
-    additionalPayeePercentage: number | null,
+  id: string,
+  name: string,
+  artistAddress: string,
+  curationStatus: "curated" | "playground" | "factory",
+  additionalPayee: string | null,
+  additionalPayeePercentage: number | null,
 }
 
 type T_Contract = {
-    id: string
+  id: string
 }
 
 export type T_Token = {
@@ -18,15 +18,15 @@ export type T_Token = {
   project: T_Project;
 };
 
-export type T_OpenSeaSaleLookupTable = {
+export type T_SaleLookupTable = {
   id: string;
   token: T_Token;
-  //openSeaSale: T_OpenSeaSale;
+  //sale: T_Sale;
 };
 
-export type T_OpenSeaSale = {
+export type T_Sale = {
   id: string;
-  openSeaVersion: "V1" | "V2" | "Vunknown";
+  exchange: "OS_V1" | "OS_V2" | "LR_V1" | "OS_Vunknown";
   saleType: "Single" | "Bundle";
   blockNumber: number;
   blockTimestamp: string;
@@ -36,7 +36,7 @@ export type T_OpenSeaSale = {
   price: string;
   isPrivate: boolean;
   summaryTokensSold: string;
-  openSeaSaleLookupTables: T_OpenSeaSaleLookupTable[];
+  saleLookupTables: T_SaleLookupTable[];
 };
 
 export type T_TokenZero = {

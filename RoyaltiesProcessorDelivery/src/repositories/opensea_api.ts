@@ -1,8 +1,8 @@
 const sdk = require("api")("@opensea/v1.0#bg4ikl1mk428b");
 import {
-  T_OpenSeaSale,
+  T_Sale,
   T_TokenZero,
-  T_OpenSeaSaleLookupTable,
+  T_SaleLookupTable,
   T_Token,
 } from "../types/graphQL_entities_def";
 import { delay } from "../utils/util_functions";
@@ -84,7 +84,7 @@ function openSeaEventModelToSubgraphModel(
   tokenZero: T_TokenZero,
   collectionSlug: string,
   openSeaEvents: any
-): T_OpenSeaSale[] {
+): T_Sale[] {
   return openSeaEvents.map((_event) => {
     const _saleType = _event.asset_bundle === null ? "Single" : "Bundle";
     // other part of codebase uses length of _summaryTokensSold split by ::
@@ -98,9 +98,9 @@ function openSeaEventModelToSubgraphModel(
         _numTokensSold++;
       }
     }
-    // Convert token(s) to array of subgraph's T_OpenSeaSaleLookupTable model
-    const _openSeaLookupTables: T_OpenSeaSaleLookupTable[] = [];
-    // populate this with same data as defined in opensea_sales_repository.ts
+    // Convert token(s) to array of subgraph's T_SaleLookupTable model
+    const _openSeaLookupTables: T_SaleLookupTable[] = [];
+    // populate this with same data as defined in sales_repository.ts
     if (_saleType === "Single") {
       // single sale
       // only push tokens that are in this TokenZero's project
@@ -152,8 +152,7 @@ function openSeaEventModelToSubgraphModel(
             // only push tokens that are in this TokenZero's project
             // (many projects can be in same OS collection)
             if (
-              `${
-                _event.asset_bundle.assets[i].asset_contract.address
+              `${_event.asset_bundle.assets[i].asset_contract.address
               }-${Math.floor(
                 parseInt(_event.asset_bundle.assets[i].token_id) / 1000000
               )}` === tokenZero.id
@@ -201,9 +200,9 @@ function openSeaEventModelToSubgraphModel(
       if (_event.payment_token === null) {
         console.warn(
           "[WARN] Payment token is NULL from OpenSea's api. " +
-            "This has been observed at least once, and assumption that payment " +
-            "token was ETH was valid. Assuming ETH is payment token, but " +
-            "recommend validating on etherscan."
+          "This has been observed at least once, and assumption that payment " +
+          "token was ETH was valid. Assuming ETH is payment token, but " +
+          "recommend validating on etherscan."
         );
         console.warn(
           `[WARN] The relavent tx for msg above is: ${_event.transaction.transaction_hash}`
@@ -213,27 +212,27 @@ function openSeaEventModelToSubgraphModel(
           address: "0x0000000000000000000000000000000000000000",
         };
       }
-    const _sale: T_OpenSeaSale = {
-      id: _event.id,
-      openSeaVersion: "Vunknown",
-      saleType: _saleType,
-      blockNumber: _event.transaction.block_number,
-      blockTimestamp: _event.transaction.timestamp,
-      seller: _event.transaction.to_account.address,
-      buyer: _event.winner_account.address,
-      paymentToken: _event.payment_token.address,
-      price: _event.total_price,
-      isPrivate: _event.is_private,
-      summaryTokensSold: _summaryTokensSold,
-      openSeaSaleLookupTables: _openSeaLookupTables,
-    };
-    return _sale;
-  } catch (e) {
-    console.error("[ERROR] Error in OpenSeaSaleConverter");
-    console.error(_event)
-    console.error(_event.payment_token)
-    throw(e)
-  }
+      const _sale: T_Sale = {
+        id: _event.id,
+        exchange: "OS_Vunknown",
+        saleType: _saleType,
+        blockNumber: _event.transaction.block_number,
+        blockTimestamp: _event.transaction.timestamp,
+        seller: _event.transaction.to_account.address,
+        buyer: _event.winner_account.address,
+        paymentToken: _event.payment_token.address,
+        price: _event.total_price,
+        isPrivate: _event.is_private,
+        summaryTokensSold: _summaryTokensSold,
+        saleLookupTables: _openSeaLookupTables,
+      };
+      return _sale;
+    } catch (e) {
+      console.error("[ERROR] Error in OpenSeaSaleConverter");
+      console.error(_event)
+      console.error(_event.payment_token)
+      throw (e)
+    }
   });
 }
 
@@ -245,8 +244,8 @@ export async function getOpenSeaSalesEvents(
   tokenZero: T_TokenZero,
   occurredBeforeTimestamp: number,
   minBlockNumber: number
-): Promise<T_OpenSeaSale[]> {
-  const openSeaSales: T_OpenSeaSale[] = [];
+): Promise<T_Sale[]> {
+  const openSeaSales: T_Sale[] = [];
   let _next = "";
   while (true) {
     let url = `https://api.opensea.io/api/v1/events?only_opensea=true&collection_slug=${collectionSlug}&event_type=successful&occurred_before=${occurredBeforeTimestamp}`;
@@ -272,7 +271,7 @@ export async function getOpenSeaSalesEvents(
           method: "get",
           headers: headers,
         });
-      } catch (error) {}
+      } catch (error) { }
       if (!response.ok) {
         console.warn(
           `[WARN] Error while retrieving sales for collection ${collectionSlug}. Cooling off for 5 seconds to avoid 429 errors.`
