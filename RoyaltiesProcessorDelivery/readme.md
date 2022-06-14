@@ -100,7 +100,7 @@ Until properly handled, these assumptions may result in incorrect payment estima
   - This is not true in all cases, especially for arbitrage bots
     - e.g. https://etherscan.io/tx/0x128763e116ec0f0760bd64f7cbb066b67458f35317d5911a9357734463a91c4a
   - The solution to this is to update the subgraph schema to not use `tx_hash` as a primary key for the OpenSeaSale entity
-  - Current behavior of subgraph is that only the last sale to occur in a tx is recorded (overwrites all previous sales in tx)~~
+  - Current behavior of subgraph is that only the last sale to occur in a tx is recorded (overwrites all previous sales in tx)
 
 **Overestimates Artist Payments**:
   - *no known bugs at this time*
