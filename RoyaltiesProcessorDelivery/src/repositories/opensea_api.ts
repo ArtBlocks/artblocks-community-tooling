@@ -214,7 +214,7 @@ function openSeaEventModelToSubgraphModel(
       }
       const _sale: T_Sale = {
         id: _event.id,
-        exchange: "Vunknown",
+        exchange: "OS_Vunknown",
         saleType: _saleType,
         blockNumber: _event.transaction.block_number,
         blockTimestamp: _event.transaction.timestamp,

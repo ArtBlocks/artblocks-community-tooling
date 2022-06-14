@@ -66,7 +66,7 @@ export class ProjectReport {
                 OS_V1: BigNumber.from(0),
                 OS_V2: BigNumber.from(0),
                 LR_V1: BigNumber.from(0),
-                Vunknown: BigNumber.from(0), // when using OS API, version is unknown
+                OS_Vunknown: BigNumber.from(0), // when using OS API, version is unknown
             };
         }
 

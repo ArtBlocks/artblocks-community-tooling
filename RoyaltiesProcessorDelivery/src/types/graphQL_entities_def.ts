@@ -26,7 +26,7 @@ export type T_SaleLookupTable = {
 
 export type T_Sale = {
   id: string;
-  exchange: "OS_V1" | "OS_V2" | "LR_V1" | "Vunknown";
+  exchange: "OS_V1" | "OS_V2" | "LR_V1" | "OS_Vunknown";
   saleType: "Single" | "Bundle";
   blockNumber: number;
   blockTimestamp: string;
