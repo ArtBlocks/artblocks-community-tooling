@@ -1,123 +1,117 @@
-import { BigNumber } from "ethers";
-import {
-  BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES,
-} from "../constant";
-import fetch from "node-fetch";
+import { BigNumber } from 'ethers'
+import { BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES } from '../constant'
+import fetch from 'node-fetch'
 
-import { delay, findCommonElements } from "../utils/util_functions";
-import { SalesRepository } from "../repositories/sales_repository";
-import { TokenZeroRepository } from "../repositories/token_zero_repository";
+import { delay, findCommonElements } from '../utils/util_functions'
+import { SalesRepository } from '../repositories/sales_repository'
+import { TokenZeroRepository } from '../repositories/token_zero_repository'
 import {
   getOpenSeaAssetCollectionSlug,
   getOpenSeaSalesEvents,
-} from "../repositories/opensea_api";
-import { T_Sale, T_TokenZero } from "../types/graphQL_entities_def";
-import { ProjectReport } from "../types/project_report";
+} from '../repositories/opensea_api'
+import { T_Sale, T_TokenZero } from '../types/graphQL_entities_def'
+import { ProjectReport } from '../types/project_report'
 
-const flatCache = require("flat-cache");
-const collectionSlugCache = flatCache.load(
-  "collectionSlugCache",
-  ".slug_cache"
-);
+const flatCache = require('flat-cache')
+const collectionSlugCache = flatCache.load('collectionSlugCache', '.slug_cache')
 
 type T_SlugAndTokenZero = {
-  collectionSlug: string;
-  tokenZero: T_TokenZero;
-};
+  collectionSlug: string
+  tokenZero: T_TokenZero
+}
 
 /**
  * This gets timestamp for a given block number via fetch of etherscan api
  */
 async function getBlockTimestamp(blockNumber) {
-  let success = false;
-  let retries = 0;
-  const maxRetries = 5;
-  let data: any;
+  let success = false
+  let retries = 0
+  const maxRetries = 5
+  let data: any
   while (!success) {
     const response = await fetch(
       `https://api.etherscan.io/api?module=block&action=getblockreward&blockno=${blockNumber}`
-    );
-    data = await response.json();
+    )
+    data = await response.json()
     if (data.result.timeStamp !== undefined) {
-      success = true;
+      success = true
     } else {
       if (retries >= maxRetries) {
         console.error(
           `[ERROR] reached maximum retries when getting block timestamp via etherscan api for block number ${blockNumber}`
-        );
-        throw "[ERROR] exiting due to etherscan api failure";
+        )
+        throw '[ERROR] exiting due to etherscan api failure'
       }
-      retries++;
+      retries++
       console.warn(
         `[WARN] Etherscan API failure... Retry ${retries} of ${maxRetries}...`
-      );
-      await delay(5000);
+      )
+      await delay(5000)
     }
   }
-  return parseInt(data.result.timeStamp);
+  return parseInt(data.result.timeStamp)
 }
 
 export class SalesService {
-  #saleRepository: SalesRepository;
-  #tokenZeroRepository: TokenZeroRepository;
+  #saleRepository: SalesRepository
+  #tokenZeroRepository: TokenZeroRepository
 
   constructor(
     saleRepository: SalesRepository,
     tokenZeroRepository: TokenZeroRepository
   ) {
-    this.#saleRepository = saleRepository;
-    this.#tokenZeroRepository = tokenZeroRepository;
+    this.#saleRepository = saleRepository
+    this.#tokenZeroRepository = tokenZeroRepository
   }
 
   static saleHasRoyalties(sale: T_Sale) {
     // OpenSea's API sometimes labels is_private as null when it appears to be true,
     // so treat null as true for our filter to be accurate.
     if (sale.isPrivate === null) {
-      return true;
+      return true
     }
     return (
       sale.isPrivate === false ||
       (sale.isPrivate &&
         sale.blockNumber >= BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES)
-    );
+    )
   }
 
   async getAllSalesBetweenBlockNumbers(
     blockRange: [number, number]
   ): Promise<T_Sale[]> {
-    const first = 1000;
-    let sales: T_Sale[] = [];
-    let [blockNumberGte, blockNumberLt] = blockRange;
+    const first = 1000
+    let sales: T_Sale[] = []
+    let [blockNumberGte, blockNumberLt] = blockRange
 
     while (true) {
       console.log(
         `Fetching last ${first} sales from subgraph for block range: ` +
-        `[${blockNumberGte}; ${blockNumberLt}[`
-      );
-      const newSales =
-        await this.#saleRepository.getSalesBetweenBlockNumbers(
-          { first, skip: 0 },
-          blockNumberGte,
-          blockNumberLt
-        );
+          `[${blockNumberGte}; ${blockNumberLt}[`
+      )
+      const newSales = await this.#saleRepository.getSalesBetweenBlockNumbers(
+        { first, skip: 0 },
+        blockNumberGte,
+        blockNumberLt
+      )
 
       if (newSales.length < first) {
         // found all remaining sales, no scroll required
-        sales.push(...newSales);
-        break;
+        sales.push(...newSales)
+        break
       }
 
-      let blockNumberFinalSale = -1;
-      let foundBlockToSplit = false;
+      let blockNumberFinalSale = -1
+      let foundBlockToSplit = false
       while (!foundBlockToSplit) {
         // We are fetching the sales in desc order by block number
         // Here the last sale will be the one with the lowest block number
-        const lastSale = newSales.pop()!;
+        const lastSale = newSales.pop()!
 
         // Save the blocknumber of the initial last sale
         if (blockNumberFinalSale === -1) {
-          blockNumberFinalSale = lastSale.blockNumber;
-          continue;
+          blockNumberFinalSale = lastSale.blockNumber
+          continue
         }
 
         // Next query blockNumberLt should be first block found that is different
@@ -126,22 +120,22 @@ export class SalesService {
         // Add all sales found prior to blockNumberFinalSale.
         if (blockNumberFinalSale < lastSale.blockNumber) {
           // Repush the sale since we popped it
-          newSales.push(lastSale);
+          newSales.push(lastSale)
 
           // set the higer bound of the range (exclusive) to the last sale
           // block number we just popped
-          blockNumberLt = lastSale.blockNumber;
+          blockNumberLt = lastSale.blockNumber
 
           // Exit the searching loop
-          foundBlockToSplit = true;
+          foundBlockToSplit = true
         }
       }
 
-      sales.push(...newSales);
+      sales.push(...newSales)
     }
-    console.log("");
+    console.log('')
 
-    return sales;
+    return sales
   }
 
   /**
@@ -158,14 +152,14 @@ export class SalesService {
     contracts: string[],
     projectIdsToAdd: string[]
   ): Promise<T_Sale[]> {
-    const first = 1000;
+    const first = 1000
     // the thing we are retuning: sales array
-    let openSeaSales: T_Sale[] = [];
+    let openSeaSales: T_Sale[] = []
     // get token zeros for every project of interest
-    let tokenZeros: T_TokenZero[] = [];
+    let tokenZeros: T_TokenZero[] = []
 
     while (true) {
-      console.log(`Fetching first ${first} token zeros from subgraph...`);
+      console.log(`Fetching first ${first} token zeros from subgraph...`)
       const newTokenZeros =
         await this.#tokenZeroRepository.getAllTokenZerosOnContracts(
           {
@@ -173,17 +167,17 @@ export class SalesService {
             skip: 0,
           },
           contracts
-        );
+        )
 
       if (newTokenZeros.length < first) {
         // found all remaining sales, no scroll required
-        tokenZeros.push(...newTokenZeros);
-        break;
+        tokenZeros.push(...newTokenZeros)
+        break
       } else {
         console.error(
-          "[ERROR] found >1000 projects, tell devs to add capability to scroll! results invalid."
-        );
-        throw "Contact devs";
+          '[ERROR] found >1000 projects, tell devs to add capability to scroll! results invalid.'
+        )
+        throw 'Contact devs'
       }
       // warning to devs in future - when adding ability to scroll, keep in mind
       // that TheGraph has an upper limit on skip, so may need to filter in
@@ -193,7 +187,7 @@ export class SalesService {
     if (projectIdsToAdd.length > 0) {
       console.log(
         `Fetching additional token zeros from subgraph for projectIds: ${projectIdsToAdd}`
-      );
+      )
       const newTokenZeros =
         await this.#tokenZeroRepository.getAllTokenZerosWithProjectIds(
           {
@@ -201,7 +195,7 @@ export class SalesService {
             skip: 0,
           },
           projectIdsToAdd
-        );
+        )
       // double check that we aren't adding the same projectId twice
       // (should never happen, for bug catching only)
       if (
@@ -210,95 +204,93 @@ export class SalesService {
           newTokenZeros.map((_newTokenZero) => _newTokenZero.id)
         )
       ) {
-        throw "projectIdsToAdd were already queried. This should never happen, check config file.";
+        throw 'projectIdsToAdd were already queried. This should never happen, check config file.'
       }
       // add valid new token zeros to array of total token zeros to return
-      tokenZeros.push(...newTokenZeros);
+      tokenZeros.push(...newTokenZeros)
     }
-    console.log("");
+    console.log('')
     // query OpenSea api for every token zero to build array of collection slugs
     // iterate one-by-one to eliminate too-many-calls response from OS API
     // use local cache because this takes a long time due to OS's API.
-    const slugsAndTokenZeros: T_SlugAndTokenZero[] = [];
+    const slugsAndTokenZeros: T_SlugAndTokenZero[] = []
     for (let i = 0; i < tokenZeros.length; i++) {
-      const _tokenZero = tokenZeros[i];
+      const _tokenZero = tokenZeros[i]
       console.info(
         `[INFO] Getting OS collection slug for: ${_tokenZero.tokens[0].project.name}`
-      );
+      )
       let collectionSlug = collectionSlugCache.getKey(
         _tokenZero.tokens[0].project.id
-      );
+      )
       if (collectionSlug !== undefined) {
-        console.info(`[INFO] using cached collection slug ${collectionSlug}`);
+        console.info(`[INFO] using cached collection slug ${collectionSlug}`)
         slugsAndTokenZeros.push({
           collectionSlug: collectionSlug,
           tokenZero: _tokenZero,
-        });
+        })
       } else {
         collectionSlug = await getOpenSeaAssetCollectionSlug(
           _tokenZero.tokens[0].contract.id,
           _tokenZero.tokens[0].tokenId.toString()
-        );
+        )
         slugsAndTokenZeros.push({
           collectionSlug: collectionSlug,
           tokenZero: _tokenZero,
-        });
+        })
         // add slug to cache, save
         collectionSlugCache.setKey(
           _tokenZero.tokens[0].project.id,
           collectionSlug
-        );
-        collectionSlugCache.save(true);
+        )
+        collectionSlugCache.save(true)
       }
     }
     // OS api works in terms of timestamps, not blocks.
-    let maxTimestamp = await getBlockTimestamp(blockRange[1]);
+    let maxTimestamp = await getBlockTimestamp(blockRange[1])
 
     // retrieve all events in timestamp/block range, for each collection
     // populate openSeaSales along the way!
     for (let i = 0; i < slugsAndTokenZeros.length; i++) {
-      const _slugAndTokenZero = slugsAndTokenZeros[i];
+      const _slugAndTokenZero = slugsAndTokenZeros[i]
       console.info(
         `[INFO] Getting OS sale events for: ${_slugAndTokenZero.collectionSlug}`
-      );
+      )
       const _newOpenSeaSales = await getOpenSeaSalesEvents(
         _slugAndTokenZero.collectionSlug,
         _slugAndTokenZero.tokenZero,
         maxTimestamp,
         blockRange[0]
-      );
-      openSeaSales.push(..._newOpenSeaSales);
+      )
+      openSeaSales.push(..._newOpenSeaSales)
     }
 
-    return openSeaSales;
+    return openSeaSales
   }
 
-  generateProjectReports(
-    sales: T_Sale[]
-  ): Map<string, ProjectReport> {
-    const projectReports = new Map<string, ProjectReport>();
+  generateProjectReports(sales: T_Sale[]): Map<string, ProjectReport> {
+    const projectReports = new Map<string, ProjectReport>()
 
     // Browse all sales
     for (const sale of sales) {
-      const saleLookupTables = sale.saleLookupTables;
+      const saleLookupTables = sale.saleLookupTables
       if (saleLookupTables.length === 0) {
-        console.info("[found open sea sale with length of zero!]");
+        console.info('[found open sea sale with length of zero!]')
       }
 
       // In the pre-filtering stage we might have removed some so we can't
       // get the  number from the saleLookupTables list length
-      const nbTokensSold = sale.summaryTokensSold.split("::").length;
+      const nbTokensSold = sale.summaryTokensSold.split('::').length
 
       // Browse the list of tokens sold in this sale
       // May be only one in the case of a "Single" sale
       // May be several in the case of a "Bundle" sale
       // In the case of "Bundle" sale only AB tokens are registered by the AB subgraph
       for (const tokenSaleLookupTable of saleLookupTables) {
-        const token = tokenSaleLookupTable.token;
-        const project = token.project;
+        const token = tokenSaleLookupTable.token
+        const project = token.project
 
         // Get/Instanciate the projectReport
-        let projectReport = projectReports.get(project.name);
+        let projectReport = projectReports.get(project.name)
         if (projectReport === undefined) {
           projectReport = new ProjectReport(
             parseInt(project.id),
@@ -306,21 +298,21 @@ export class SalesService {
             project.artistAddress,
             project.additionalPayee,
             project.additionalPayeePercentage
-          );
+          )
         }
 
-        projectReport.addSale(sale, nbTokensSold);
-        projectReports.set(project.name, projectReport);
+        projectReport.addSale(sale, nbTokensSold)
+        projectReports.set(project.name, projectReport)
       }
     }
 
     // Once all sales have been processed
     // we can compute the crypto due to artists
     for (const projectName of projectReports.keys()) {
-      const projectReport = projectReports.get(projectName)!;
-      projectReport.computeCryptoDue();
+      const projectReport = projectReports.get(projectName)!
+      projectReport.computeCryptoDue()
     }
 
-    return projectReports;
+    return projectReports
   }
 }

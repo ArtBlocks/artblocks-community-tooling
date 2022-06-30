@@ -1,7 +1,7 @@
-import { gql } from "graphql-request"
+import { gql } from 'graphql-request'
 
-import { GraphQLDatasource } from "../datasources/graphQL_datasource";
-import { T_Sale } from "../types/graphQL_entities_def";
+import { GraphQLDatasource } from '../datasources/graphQL_datasource'
+import { T_Sale } from '../types/graphQL_entities_def'
 
 const QUERY_GET_SALES = gql`
 query getSales($first: Int!, $skip: Int!) {
@@ -33,18 +33,18 @@ query getSales($first: Int!, $skip: Int!) {
       }
     }
   }
-}`;
+}`
 
 type T_QueryVariable_GetSales = {
-  first: number;
-  skip: number;
-};
+  first: number
+  skip: number
+}
 
 export class SalesRepository {
-  #graphQLDatasource: GraphQLDatasource;
+  #graphQLDatasource: GraphQLDatasource
 
   constructor(graphQLDatasource: GraphQLDatasource) {
-    this.#graphQLDatasource = graphQLDatasource;
+    this.#graphQLDatasource = graphQLDatasource
   }
 
   async getSalesBetweenBlockNumbers(
@@ -53,11 +53,11 @@ export class SalesRepository {
     blockNumberLt: number
   ): Promise<T_Sale[]> {
     const query = QUERY_GET_SALES.replace(
-      "WHERE_CLAUSE",
+      'WHERE_CLAUSE',
       `blockNumber_gte: ${blockNumberGte}, blockNumber_lt: ${blockNumberLt}`
-    );
+    )
 
-    const resp = await this.#graphQLDatasource.query(query, variables);
-    return resp.sales as T_Sale[];
+    const resp = await this.#graphQLDatasource.query(query, variables)
+    return resp.sales as T_Sale[]
   }
 }
