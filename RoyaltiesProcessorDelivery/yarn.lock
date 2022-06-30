@@ -1996,6 +1996,11 @@ pkg-dir@^4.1.0:
   dependencies:
     find-up "^4.0.0"
 
+prettier@^2.7.1:
+  version "2.7.1"
+  resolved "https://registry.yarnpkg.com/prettier/-/prettier-2.7.1.tgz#e235806850d057f97bb08368a4f7d899f7760c64"
+  integrity sha512-ujppO+MkdPqoVINuDFDRLClm7D78qbDt0/NR+wp5FqEZOoTNAjPHWj17QRhu7geIHJfcNhRk1XVQmF8Bp3ye+g==
+
 promise.any@^2.0.2:
   version "2.0.4"
   resolved "https://registry.yarnpkg.com/promise.any/-/promise.any-2.0.4.tgz#beef570a04db537d022b395d776af2aef9b64f00"

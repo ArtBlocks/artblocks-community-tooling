@@ -1,46 +1,43 @@
-import yargs from "yargs";
-import { hideBin } from "yargs/helpers";
-import fetch from "node-fetch";
+import yargs from 'yargs'
+import { hideBin } from 'yargs/helpers'
+import fetch from 'node-fetch'
 
 import {
   REPORTS_FOLDER,
   URL_GRAPHQL_ENDPOINT,
   BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES,
   AB_FLAGSHIP_CONTRACTS,
-} from "./constant";
-import { arraysEqual } from "./utils/util_functions";
-import { GraphQLDatasource } from "./datasources/graphQL_datasource";
-import { SalesRepository } from "./repositories/sales_repository";
-import { ReportService } from "./services/report_service";
-import { SalesService } from "./services/sales_service";
-import { T_Sale } from "./types/graphQL_entities_def";
-import { exit } from "process";
-import { TokenZeroRepository } from "./repositories/token_zero_repository";
-import { getOpenSeaAssetCollectionSlug } from "./repositories/opensea_api";
+} from './constant'
+import { arraysEqual } from './utils/util_functions'
+import { GraphQLDatasource } from './datasources/graphQL_datasource'
+import { SalesRepository } from './repositories/sales_repository'
+import { ReportService } from './services/report_service'
+import { SalesService } from './services/sales_service'
+import { T_Sale } from './types/graphQL_entities_def'
+import { exit } from 'process'
+import { TokenZeroRepository } from './repositories/token_zero_repository'
+import { getOpenSeaAssetCollectionSlug } from './repositories/opensea_api'
 
 // import config file of pbab projects on flagship contracts
-import { default as pbabProjectsOnFlagshipConfig } from "../config/pbabProjectsOnFlagship.json";
+import { default as pbabProjectsOnFlagshipConfig } from '../config/pbabProjectsOnFlagship.json'
 
 // Instanciate datasources, repositories and services
-const graphQLDatasource = new GraphQLDatasource(URL_GRAPHQL_ENDPOINT);
-const salesRepository = new SalesRepository(graphQLDatasource);
-const tokenZeroRepository = new TokenZeroRepository(graphQLDatasource);
-const saleService = new SalesService(
-  salesRepository,
-  tokenZeroRepository
-);
+const graphQLDatasource = new GraphQLDatasource(URL_GRAPHQL_ENDPOINT)
+const salesRepository = new SalesRepository(graphQLDatasource)
+const tokenZeroRepository = new TokenZeroRepository(graphQLDatasource)
+const saleService = new SalesService(salesRepository, tokenZeroRepository)
 
-type Collection = "curated" | "playground" | "factory";
-type Exchange = "OS_V1" | "OS_V2" | "OS" | "LR_V1";
+type Collection = 'curated' | 'playground' | 'factory'
+type Exchange = 'OS_V1' | 'OS_V2' | 'OS' | 'LR_V1'
 
 type SalesFilter = {
-  collectionFilter?: Collection;
-  contractFilterType?: "ONLY" | "ONLY_NOT";
-  contractsFilter?: string[];
-  exchangeFilter?: Exchange;
-};
+  collectionFilter?: Collection
+  contractFilterType?: 'ONLY' | 'ONLY_NOT'
+  contractsFilter?: string[]
+  exchangeFilter?: Exchange
+}
 
-const reportService = new ReportService();
+const reportService = new ReportService()
 
 function generateFriendlyCsvOutputFilePath(
   command: string,
@@ -48,11 +45,11 @@ function generateFriendlyCsvOutputFilePath(
   currentBlock: number,
   useOpenSeaApi: boolean
 ): string {
-  const osApiSuffix = useOpenSeaApi ? "_osAPI" : "";
+  const osApiSuffix = useOpenSeaApi ? '_osAPI' : ''
   return (
     REPORTS_FOLDER +
     `/${command}_${previousBlock}_${currentBlock}${osApiSuffix}.csv`
-  );
+  )
 }
 
 /**
@@ -60,10 +57,10 @@ function generateFriendlyCsvOutputFilePath(
  */
 async function getCurrentBlockNumber() {
   const response = await fetch(
-    "https://api.etherscan.io/api?module=proxy&action=eth_blockNumber"
-  );
-  const data: any = await response.json();
-  return parseInt(data.result, 16);
+    'https://api.etherscan.io/api?module=proxy&action=eth_blockNumber'
+  )
+  const data: any = await response.json()
+  return parseInt(data.result, 16)
 }
 
 /**
@@ -72,23 +69,23 @@ async function getCurrentBlockNumber() {
  * projectIds are in same format as Project entity id in our subgraph.
  */
 function getProjectIdsToExcludeAndAdd(salesFilter: SalesFilter) {
-  const contractFilterType = salesFilter.contractFilterType;
-  const contractsFilter = salesFilter.contractsFilter;
+  const contractFilterType = salesFilter.contractFilterType
+  const contractsFilter = salesFilter.contractsFilter
   // if flagship, exclude all pbab projects on flagship
-  const projectIdsToExclude: string[] = [];
+  const projectIdsToExclude: string[] = []
   if (
-    contractFilterType === "ONLY" &&
+    contractFilterType === 'ONLY' &&
     arraysEqual(contractsFilter, AB_FLAGSHIP_CONTRACTS)
   ) {
     projectIdsToExclude.push(
       ...Object.keys(pbabProjectsOnFlagshipConfig).map((_projectId) =>
         _projectId.toLowerCase()
       )
-    );
+    )
   }
   // if limited to a single PBAB address, include core contract tokens that
   // tree under that pbab project
-  const projectIdsToAdd: string[] = [];
+  const projectIdsToAdd: string[] = []
   if (
     contractsFilter?.length === 1 &&
     !AB_FLAGSHIP_CONTRACTS.includes(contractsFilter![0])
@@ -100,11 +97,11 @@ function getProjectIdsToExcludeAndAdd(salesFilter: SalesFilter) {
         contractsFilter![0] ===
         pbabProjectsOnFlagshipConfig[_projectId].pbab_contract.toLowerCase()
       ) {
-        projectIdsToAdd.push(_projectId.toLowerCase());
+        projectIdsToAdd.push(_projectId.toLowerCase())
       }
-    });
+    })
   }
-  return { projectIdsToExclude, projectIdsToAdd };
+  return { projectIdsToExclude, projectIdsToAdd }
 }
 
 /**
@@ -125,92 +122,90 @@ async function processSales(
    *  - subgraph mode - nothing more; already query for every token sale by default because subgraph is fast
    */
   const { projectIdsToExclude, projectIdsToAdd } =
-    getProjectIdsToExcludeAndAdd(salesFilter);
+    getProjectIdsToExcludeAndAdd(salesFilter)
 
-  const collectionFilter = salesFilter.collectionFilter;
-  const contractFilterType = salesFilter.contractFilterType;
-  const contractsFilter = salesFilter.contractsFilter;
-  const exchangeFilter = salesFilter.exchangeFilter;
+  const collectionFilter = salesFilter.collectionFilter
+  const contractFilterType = salesFilter.contractFilterType
+  const contractsFilter = salesFilter.contractsFilter
+  const exchangeFilter = salesFilter.exchangeFilter
 
-  let sales: T_Sale[];
+  let sales: T_Sale[]
   if (!useOpenSeaApi) {
     // get all sales of all tokens in blockrange in subgraph from subgraph
-    sales = await saleService.getAllSalesBetweenBlockNumbers(
-      blockRange
-    );
+    sales = await saleService.getAllSalesBetweenBlockNumbers(blockRange)
   } else {
     // require an ONLY filter and a contractsFilter in OS API mode
     if (
-      salesFilter.contractFilterType !== "ONLY" ||
+      salesFilter.contractFilterType !== 'ONLY' ||
       salesFilter.contractsFilter === undefined
     ) {
-      throw "ONLY filter for subset of contracts is required when using OpenSea API mode";
+      throw 'ONLY filter for subset of contracts is required when using OpenSea API mode'
     }
     // use OpenSea api instead of our subgraph to build an sales object
     sales = await saleService.getAllSalesBetweenBlockNumbersOsApi(
       blockRange,
       salesFilter.contractsFilter,
       projectIdsToAdd
-    );
+    )
   }
 
-  console.info(`[INFO] ${sales.length} sales have been fetched`);
+  console.info(`[INFO] ${sales.length} sales have been fetched`)
 
   // filter out all subgraph bundles with > 1 OpenSea collection slug
   // (in series to slow down because OpenSea API is rate limited)
   console.info(
-    "[INFO] Getting OpenSea collection slugs for tokens in bundle sales... (cached upon receipt)"
-  );
-  let bundleSalesWithMultipleCollectionSlugs = 0;
+    '[INFO] Getting OpenSea collection slugs for tokens in bundle sales... (cached upon receipt)'
+  )
+  let bundleSalesWithMultipleCollectionSlugs = 0
   if (!useOpenSeaApi) {
-    const filteredSales: T_Sale[] = [];
+    const filteredSales: T_Sale[] = []
     for (let i = 0; i < sales.length; i++) {
-      const _sales = sales[i];
-      if (_sales.exchange !== "OS_V1" && _sales.exchange !== "OS_V2") {
-        filteredSales.push(_sales);
-        continue;
+      const _sales = sales[i]
+      if (_sales.exchange !== 'OS_V1' && _sales.exchange !== 'OS_V2') {
+        filteredSales.push(_sales)
+        continue
       }
-      const summaryTokensSold = _sales.summaryTokensSold.split("::");
+      const summaryTokensSold = _sales.summaryTokensSold.split('::')
       if (summaryTokensSold.length == 1) {
         // single sale, keep
-        filteredSales.push(_sales);
+        filteredSales.push(_sales)
       } else {
         // bundle sale
         const contractsAndTokenIds = summaryTokensSold.map((_id) => {
-          return _id.split("-");
-        });
+          return _id.split('-')
+        })
         // get OpenSea collection slug for each token in sale
-        const collectionSlugs: string[] = [];
+        const collectionSlugs: string[] = []
         for (let j = 0; j < contractsAndTokenIds.length; j++) {
           const _collectionSlug = await getOpenSeaAssetCollectionSlug(
             contractsAndTokenIds[j][0],
             contractsAndTokenIds[j][1]
-          );
-          collectionSlugs.push(_collectionSlug);
+          )
+          collectionSlugs.push(_collectionSlug)
         }
         // add as sale w/royalties only if all collection slugs are same
         if (
           collectionSlugs.every((_slug, _, _slugs) => {
-            return _slug === _slugs[0];
+            return _slug === _slugs[0]
           })
         ) {
-          filteredSales.push(_sales);
+          filteredSales.push(_sales)
         } else {
-          bundleSalesWithMultipleCollectionSlugs++;
+          bundleSalesWithMultipleCollectionSlugs++
         }
       }
     }
-    sales = filteredSales;
+    sales = filteredSales
   }
   console.info(
     `[INFO] Removed ${bundleSalesWithMultipleCollectionSlugs} Bundle OS sales with tokens from >1 OpenSea Collection Slug.`
-  );
+  )
 
-  let additionalSalesFoundInBundledSales = 0;
-  let skippedOtherContractsTokens = 0;
-  let skippedCurationStatus = 0;
-  let addedTokensOnFlagship = 0;
-  let excludedTokensOnFlagship = 0;
+  let additionalSalesFoundInBundledSales = 0
+  let skippedOtherContractsTokens = 0
+  let skippedCurationStatus = 0
+  let addedTokensOnFlagship = 0
+  let excludedTokensOnFlagship = 0
 
   /* Among all sales, filter those we are interested in.
    * Filter the sales that match the given SalesFilter
@@ -219,124 +214,119 @@ async function processSales(
    * for bundle sale) that passed the filter, the sale is filtered.
    */
   sales = sales.filter((sale: T_Sale) => {
-    const saleLookupTable = sale.saleLookupTables;
+    const saleLookupTable = sale.saleLookupTables
 
-    let nbTokenSold = 0;
-    let filteredSaleLookupTables = saleLookupTable.filter(
-      (saleLookupTable) => {
-        nbTokenSold += 1;
+    let nbTokenSold = 0
+    let filteredSaleLookupTables = saleLookupTable.filter((saleLookupTable) => {
+      nbTokenSold += 1
 
-        if (nbTokenSold > 1) {
-          additionalSalesFoundInBundledSales += 1;
-        }
-
-        const token = saleLookupTable.token;
-        const exchange = sale.exchange;
-
-        // special case: projectId in projectIdsToAdd
-        if (projectIdsToAdd.includes(token.project.id)) {
-          addedTokensOnFlagship++;
-          return true;
-        }
-
-        // special case: projectId in projectIdsToExclude
-        if (projectIdsToExclude.includes(token.project.id)) {
-          excludedTokensOnFlagship++;
-          return false;
-        }
-
-        const curationFilterPass =
-          collectionFilter == undefined ||
-          token.project.curationStatus === collectionFilter;
-
-        const exchangeFilterPass =
-          exchangeFilter === undefined ||
-          exchangeFilter === "OS" && exchange.startsWith("OS_V") ||
-          exchangeFilter === exchange;
-
-        const contractsFilterPass =
-          contractFilterType === undefined ||
-          (contractFilterType == "ONLY" &&
-            contractsFilter!.includes(token.contract.id)) ||
-          (contractFilterType == "ONLY_NOT" &&
-            !contractsFilter!.includes(token.contract.id));
-
-        if (curationFilterPass === false) {
-          skippedCurationStatus += 1;
-        } else if (contractsFilterPass === false) {
-          skippedOtherContractsTokens += 1;
-        }
-
-        return curationFilterPass && contractsFilterPass && exchangeFilterPass;
+      if (nbTokenSold > 1) {
+        additionalSalesFoundInBundledSales += 1
       }
-    );
+
+      const token = saleLookupTable.token
+      const exchange = sale.exchange
+
+      // special case: projectId in projectIdsToAdd
+      if (projectIdsToAdd.includes(token.project.id)) {
+        addedTokensOnFlagship++
+        return true
+      }
+
+      // special case: projectId in projectIdsToExclude
+      if (projectIdsToExclude.includes(token.project.id)) {
+        excludedTokensOnFlagship++
+        return false
+      }
+
+      const curationFilterPass =
+        collectionFilter == undefined ||
+        token.project.curationStatus === collectionFilter
+
+      const exchangeFilterPass =
+        exchangeFilter === undefined ||
+        (exchangeFilter === 'OS' && exchange.startsWith('OS_V')) ||
+        exchangeFilter === exchange
+
+      const contractsFilterPass =
+        contractFilterType === undefined ||
+        (contractFilterType == 'ONLY' &&
+          contractsFilter!.includes(token.contract.id)) ||
+        (contractFilterType == 'ONLY_NOT' &&
+          !contractsFilter!.includes(token.contract.id))
+
+      if (curationFilterPass === false) {
+        skippedCurationStatus += 1
+      } else if (contractsFilterPass === false) {
+        skippedOtherContractsTokens += 1
+      }
+
+      return curationFilterPass && contractsFilterPass && exchangeFilterPass
+    })
 
     // Replace the saleLookupTable by the filteredSaleLookupTable
-    sale.saleLookupTables = filteredSaleLookupTables;
-    return sale.saleLookupTables.length > 0;
-  });
+    sale.saleLookupTables = filteredSaleLookupTables
+    return sale.saleLookupTables.length > 0
+  })
 
   // report any tokens added on flagship
   if (addedTokensOnFlagship > 0) {
     console.info(
       `[INFO] Added ${addedTokensOnFlagship} ` +
-      `individual token sales on flagship in projectIds: ${projectIdsToAdd}`
-    );
+        `individual token sales on flagship in projectIds: ${projectIdsToAdd}`
+    )
   }
 
   // report any tokens excluded on flagship
   if (excludedTokensOnFlagship > 0) {
     console.info(
       `[INFO] Excluded ${excludedTokensOnFlagship} ` +
-      `individual token sales on flagship in projectIds: ${projectIdsToExclude}`
-    );
+        `individual token sales on flagship in projectIds: ${projectIdsToExclude}`
+    )
   }
 
   // report any additional tokens found
   if (additionalSalesFoundInBundledSales > 0) {
     console.info(
       `[INFO] Found ${additionalSalesFoundInBundledSales} ` +
-      `additional individual token sales while un-bundling bundled sales`
-    );
+        `additional individual token sales while un-bundling bundled sales`
+    )
   }
 
   // report curation status tokens skipped
   if (skippedCurationStatus) {
     console.info(
       `[INFO] Skipped ${skippedCurationStatus} ` +
-      `tokens not in collection ${collectionFilter}`
-    );
+        `tokens not in collection ${collectionFilter}`
+    )
   }
 
   // report any different contract tokens skipped
   if (skippedOtherContractsTokens) {
     console.info(
       `[INFO] Skipped ${skippedOtherContractsTokens} ` +
-      `tokens because of ${contractFilterType} in [${contractsFilter}]`
-    );
+        `tokens because of ${contractFilterType} in [${contractsFilter}]`
+    )
   }
 
-  console.info(`[INFO] ${sales.length} sales after filtering`);
+  console.info(`[INFO] ${sales.length} sales after filtering`)
 
   // Filter private sales
-  sales = sales.filter((sale) =>
-    SalesService.saleHasRoyalties(sale)
-  );
+  sales = sales.filter((sale) => SalesService.saleHasRoyalties(sale))
 
   console.info(
     `[INFO] ${sales.length} sales remaining after filtering ` +
-    `private sales without royalties (prior to block ` +
-    `${BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES})`
-  );
+      `private sales without royalties (prior to block ` +
+      `${BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES})`
+  )
 
   // if nothing found, alert and return
   if (sales.length <= 0) {
-    console.info("[INFO] No sales found (nothing to process), exiting");
-    return;
+    console.info('[INFO] No sales found (nothing to process), exiting')
+    return
   }
 
-  const projectReports =
-    saleService.generateProjectReports(sales);
+  const projectReports = saleService.generateProjectReports(sales)
 
   if (csvOutputFilePath !== undefined) {
     if (pbabInvoice) {
@@ -344,186 +334,185 @@ async function processSales(
         blockRange,
         Array.from(projectReports.values()),
         csvOutputFilePath.replace(
-          ".csv",
+          '.csv',
           `_pbab_invoice_${contractsFilter!.toString()}.csv`
         ),
         contractsFilter!.toString()
-      );
-      return;
+      )
+      return
     }
-    const csvRawOutputFilePath = csvOutputFilePath.replace(".csv", "_raw.csv");
+    const csvRawOutputFilePath = csvOutputFilePath.replace('.csv', '_raw.csv')
     const csvDetailedOutputFilePath = csvOutputFilePath.replace(
-      ".csv",
-      "_detailed.csv"
-    );
+      '.csv',
+      '_detailed.csv'
+    )
     reportService.generateCSVFromProjectReports(
       blockRange,
       Array.from(projectReports.values()),
       csvOutputFilePath
-    );
+    )
     reportService.generateDetailedCSVFromProjectReports(
       blockRange,
       Array.from(projectReports.values()),
       csvDetailedOutputFilePath
-    );
+    )
     reportService.generateRawCSVFromProjectReports(
       blockRange,
       Array.from(projectReports.values()),
       csvRawOutputFilePath
-    );
-    return;
+    )
+    return
   }
   // Print output to console
   reportService.outputReportToConsole(
     blockRange,
     Array.from(projectReports.values())
-  );
+  )
 }
 
 yargs(hideBin(process.argv))
   .strict()
   .command(
-    "range <startingBlock> [endingBlock] [collection] [flagship] [csv] [outputPath]",
-    "Process all Opensea and LooksRare sales after startingBlock (included) and before endingBlock (excluded)",
+    'range <startingBlock> [endingBlock] [collection] [flagship] [csv] [outputPath]',
+    'Process all Opensea and LooksRare sales after startingBlock (included) and before endingBlock (excluded)',
     (yargs) => {
       yargs
-        .positional("startingBlock", {
+        .positional('startingBlock', {
           description:
-            "Only the sales between the given block numbers ([startingBlock; endingBlock[) will be processed.",
-          type: "number",
+            'Only the sales between the given block numbers ([startingBlock; endingBlock[) will be processed.',
+          type: 'number',
         })
-        .option("endingBlock", {
+        .option('endingBlock', {
           description:
-            "Only the sales between the given block numbers ([startingBlock; endingBlock[) will be processed. If no endingBlock is provided it will run up to the current block number",
-          type: "number",
+            'Only the sales between the given block numbers ([startingBlock; endingBlock[) will be processed. If no endingBlock is provided it will run up to the current block number',
+          type: 'number',
         })
-        .option("collection", {
-          description: "A filter to only process sales of the given collection",
-          type: "string",
-          choices: ["curated", "playground", "factory"],
+        .option('collection', {
+          description: 'A filter to only process sales of the given collection',
+          type: 'string',
+          choices: ['curated', 'playground', 'factory'],
         })
-        .option("flagship", {
+        .option('flagship', {
           description:
-            "A filter to only process sales of Art Blocks flagship product (i.e. excludes PBAB)",
-          type: "boolean",
-          conflicts: "PBAB",
+            'A filter to only process sales of Art Blocks flagship product (i.e. excludes PBAB)',
+          type: 'boolean',
+          conflicts: 'PBAB',
         })
-        .option("PBAB", {
+        .option('PBAB', {
           description:
-            "A filter to only process sales of Art Blocks PBAB products",
-          type: "boolean",
-          conflicts: ["flagship", "collection"],
+            'A filter to only process sales of Art Blocks PBAB products',
+          type: 'boolean',
+          conflicts: ['flagship', 'collection'],
         })
-        .option("contract", {
+        .option('contract', {
           description:
-            "A filter to only process sales of the given contract address",
-          type: "string",
-          conflicts: ["flagship", "PBAB"],
+            'A filter to only process sales of the given contract address',
+          type: 'string',
+          conflicts: ['flagship', 'PBAB'],
         })
-        .option("csv", {
+        .option('csv', {
           description:
-            "If present, the output will be written to CSV files. Else the results will printed to the console.",
-          type: "boolean",
+            'If present, the output will be written to CSV files. Else the results will printed to the console.',
+          type: 'boolean',
         })
-        .option("outputPath", {
-          implies: "csv",
+        .option('outputPath', {
+          implies: 'csv',
           description:
-            "Specify the file path where the CSV files will be stored. Requires the --csv flag to be set.",
-          type: "string",
+            'Specify the file path where the CSV files will be stored. Requires the --csv flag to be set.',
+          type: 'string',
         })
-        .option("osAPI", {
+        .option('osAPI', {
           description:
-            "If present, the OpenSea api will be used instead of the subgraph. requires either: --flagship OR --contract.",
-          type: "boolean",
-          conflicts: ["collection", "PBAB"],
+            'If present, the OpenSea api will be used instead of the subgraph. requires either: --flagship OR --contract.',
+          type: 'boolean',
+          conflicts: ['collection', 'PBAB'],
         })
-        .option("pbabInvoice", {
+        .option('pbabInvoice', {
           description:
-            "Generates a PBAB invoice summary report. Requires a single PBAB core contract arg.",
-          type: "boolean",
-          conflicts: ["flagship", "PBAB", "collection"],
-          implies: ["contract", "csv"],
+            'Generates a PBAB invoice summary report. Requires a single PBAB core contract arg.',
+          type: 'boolean',
+          conflicts: ['flagship', 'PBAB', 'collection'],
+          implies: ['contract', 'csv'],
         })
-        .option("exchange", {
-          description:
-            "Only the sales coming from a given exchange.",
-          type: "string",
-          choices: ["OS_V1", "OS_V2", "OS", "LR_V1"],
-        });
+        .option('exchange', {
+          description: 'Only the sales coming from a given exchange.',
+          type: 'string',
+          choices: ['OS_V1', 'OS_V2', 'OS', 'LR_V1'],
+        })
     },
     async (argv) => {
-      let startingBlock = argv.startingBlock as number;
-      let endingBlock = argv.endingBlock as number;
+      let startingBlock = argv.startingBlock as number
+      let endingBlock = argv.endingBlock as number
 
-      let writeToCsv = argv.csv !== undefined;
-      let outputPath = argv.outputPath as string | undefined;
+      let writeToCsv = argv.csv !== undefined
+      let outputPath = argv.outputPath as string | undefined
 
-      let useOpenSeaApi = argv.osAPI as boolean | false;
-      console.info("[INFO] Use OpenSea API Mode? -> ", !!useOpenSeaApi);
+      let useOpenSeaApi = argv.osAPI as boolean | false
+      console.info('[INFO] Use OpenSea API Mode? -> ', !!useOpenSeaApi)
 
-      const collection = argv.collection as Collection | undefined;
-      const exchange = argv.exchange as Exchange | undefined;
+      const collection = argv.collection as Collection | undefined
+      const exchange = argv.exchange as Exchange | undefined
       let salesFilter: SalesFilter = {
         collectionFilter: collection,
         exchangeFilter: exchange,
-      };
+      }
 
       // Those 3 optional params are conflicting with each others, only one
       // can be specified at a time
-      const flagship = argv.flagship as boolean | undefined;
-      const pbab = argv.PBAB as boolean | undefined;
-      const pbabInvoice = argv.pbabInvoice as boolean | undefined;
-      let contract = argv.contract as string | undefined;
+      const flagship = argv.flagship as boolean | undefined
+      const pbab = argv.PBAB as boolean | undefined
+      const pbabInvoice = argv.pbabInvoice as boolean | undefined
+      let contract = argv.contract as string | undefined
       if (useOpenSeaApi && !flagship && !contract) {
         console.error(
-          "[ERROR] OpenSea API mode currently only supports --flagship or --contract mode"
-        );
-        throw "invalid configuration";
+          '[ERROR] OpenSea API mode currently only supports --flagship or --contract mode'
+        )
+        throw 'invalid configuration'
       }
 
-      if (useOpenSeaApi && exchange !== "OS") {
+      if (useOpenSeaApi && exchange !== 'OS') {
         console.error(
-          "[ERROR] Exchange filter of OS is required when using OpenSea API mode"
-        );
-        throw "invalid configuration";
+          '[ERROR] Exchange filter of OS is required when using OpenSea API mode'
+        )
+        throw 'invalid configuration'
       }
 
       if (flagship) {
-        salesFilter.contractFilterType = "ONLY";
-        salesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS;
+        salesFilter.contractFilterType = 'ONLY'
+        salesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS
       } else if (pbab) {
-        salesFilter.contractFilterType = "ONLY_NOT";
-        salesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS;
+        salesFilter.contractFilterType = 'ONLY_NOT'
+        salesFilter.contractsFilter = AB_FLAGSHIP_CONTRACTS
       } else if (contract) {
-        contract = contract.toLowerCase();
-        salesFilter.contractFilterType = "ONLY";
-        salesFilter.contractsFilter = [contract];
+        contract = contract.toLowerCase()
+        salesFilter.contractFilterType = 'ONLY'
+        salesFilter.contractsFilter = [contract]
       }
 
       // ensure ending block < currentBlock via etherscan api
-      const currentBlockNumber = await getCurrentBlockNumber();
+      const currentBlockNumber = await getCurrentBlockNumber()
       if (endingBlock === undefined) {
-        endingBlock = currentBlockNumber;
+        endingBlock = currentBlockNumber
       }
 
       if (endingBlock > currentBlockNumber) {
-        throw `Ending block (${endingBlock}) must be <= mainnet current block number: ${currentBlockNumber}!`;
+        throw `Ending block (${endingBlock}) must be <= mainnet current block number: ${currentBlockNumber}!`
       }
 
       if (writeToCsv && outputPath === undefined) {
         outputPath = generateFriendlyCsvOutputFilePath(
-          "since",
+          'since',
           startingBlock,
           endingBlock,
           useOpenSeaApi
-        );
+        )
       }
 
       if (startingBlock >= endingBlock) {
         console.error(
           `The starting block number ${startingBlock} is greater than the ending block number ${endingBlock}`
-        );
-        exit(1);
+        )
+        exit(1)
       }
       await processSales(
         [startingBlock, endingBlock],
@@ -531,10 +520,10 @@ yargs(hideBin(process.argv))
         !!useOpenSeaApi,
         !!pbabInvoice,
         outputPath
-      );
+      )
     }
   )
   .strict()
   .demandCommand()
   .help()
-  .wrap((2 * yargs.terminalWidth()) / 2).argv;
+  .wrap((2 * yargs.terminalWidth()) / 2).argv

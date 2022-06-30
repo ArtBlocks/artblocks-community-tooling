@@ -1,13 +1,13 @@
-import { GraphQLClient } from "graphql-request";
+import { GraphQLClient } from 'graphql-request'
 
 export class GraphQLDatasource {
-    #client: GraphQLClient;
+  #client: GraphQLClient
 
-    constructor(url: string) {
-        this.#client = new GraphQLClient(url);
-    }
+  constructor(url: string) {
+    this.#client = new GraphQLClient(url)
+  }
 
-    async query(query: string, variables: any): Promise<any> {
-        return await this.#client.request(query, variables);
-    }
+  async query(query: string, variables: any): Promise<any> {
+    return await this.#client.request(query, variables)
+  }
 }

@@ -1,7 +1,7 @@
-import { gql } from "graphql-request";
+import { gql } from 'graphql-request'
 
-import { GraphQLDatasource } from "../datasources/graphQL_datasource";
-import { T_TokenZero } from "../types/graphQL_entities_def";
+import { GraphQLDatasource } from '../datasources/graphQL_datasource'
+import { T_TokenZero } from '../types/graphQL_entities_def'
 
 const QUERY_GET_TOKEN_ZEROS = gql`
   query getTokenZeros($first: Int!, $skip: Int!) {
@@ -30,18 +30,18 @@ const QUERY_GET_TOKEN_ZEROS = gql`
       }
     }
   }
-`;
+`
 
 type T_QueryVariable_GetTokenZeros = {
-  first: number;
-  skip: number;
-};
+  first: number
+  skip: number
+}
 
 export class TokenZeroRepository {
-  #graphQLDatasource: GraphQLDatasource;
+  #graphQLDatasource: GraphQLDatasource
 
   constructor(graphQLDatasource: GraphQLDatasource) {
-    this.#graphQLDatasource = graphQLDatasource;
+    this.#graphQLDatasource = graphQLDatasource
   }
 
   /**
@@ -52,13 +52,13 @@ export class TokenZeroRepository {
     variables: T_QueryVariable_GetTokenZeros,
     contracts: string[]
   ): Promise<T_TokenZero[]> {
-    const contractsQuery = contracts.map((_contractId) => `"${_contractId}"`);
+    const contractsQuery = contracts.map((_contractId) => `"${_contractId}"`)
     const query = QUERY_GET_TOKEN_ZEROS.replace(
-      "WHERE_CLAUSE",
+      'WHERE_CLAUSE',
       `{ invocations_not: 0, contract_in: [${contractsQuery}] }`
-    );
-    const resp = await this.#graphQLDatasource.query(query, variables);
-    return resp.projects as T_TokenZero[];
+    )
+    const resp = await this.#graphQLDatasource.query(query, variables)
+    return resp.projects as T_TokenZero[]
   }
 
   /**
@@ -69,12 +69,12 @@ export class TokenZeroRepository {
     variables: T_QueryVariable_GetTokenZeros,
     projectIds: string[]
   ): Promise<T_TokenZero[]> {
-    const projectIdsQuery = projectIds.map((_projectId) => `"${_projectId}"`);
+    const projectIdsQuery = projectIds.map((_projectId) => `"${_projectId}"`)
     const query = QUERY_GET_TOKEN_ZEROS.replace(
-      "WHERE_CLAUSE",
+      'WHERE_CLAUSE',
       `{ invocations_not: 0, id_in: [${projectIdsQuery}] }`
-    );
-    const resp = await this.#graphQLDatasource.query(query, variables);
-    return resp.projects as T_TokenZero[];
+    )
+    const resp = await this.#graphQLDatasource.query(query, variables)
+    return resp.projects as T_TokenZero[]
   }
 }
