@@ -9,8 +9,13 @@ query getSales($first: Int!, $skip: Int!) {
     id
     exchange
     saleType
-    price
-    paymentToken
+    payments {
+      id
+      paymentType
+      paymentToken
+      price
+      recipient
+    }
     blockNumber
     blockTimestamp
     isPrivate

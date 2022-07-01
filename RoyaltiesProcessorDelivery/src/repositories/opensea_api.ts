@@ -7,6 +7,7 @@ import {
 } from '../types/graphQL_entities_def'
 import { delay } from '../utils/util_functions'
 import fetch, { Headers } from 'node-fetch'
+import { T_Payment } from '../types/graphQL_entities_def'
 
 require('dotenv').config()
 
@@ -213,6 +214,18 @@ function openSeaEventModelToSubgraphModel(
           address: '0x0000000000000000000000000000000000000000',
         }
       }
+      const _payment: T_Payment = {
+        id: _event.id + '-0',
+        paymentType:
+          _event.payment_token.address ===
+          '0x0000000000000000000000000000000000000000'
+            ? 'Native'
+            : 'ERC20',
+        paymentToken: _event.payment_token.address,
+        price: _event.total_price,
+        sale: _event.id,
+        recipient: _event.winner_account.address,
+      }
       const _sale: T_Sale = {
         id: _event.id,
         exchange: 'OS_Vunknown',
@@ -221,8 +234,7 @@ function openSeaEventModelToSubgraphModel(
         blockTimestamp: _event.transaction.timestamp,
         seller: _event.transaction.to_account.address,
         buyer: _event.winner_account.address,
-        paymentToken: _event.payment_token.address,
-        price: _event.total_price,
+        payments: [_payment],
         isPrivate: _event.is_private,
         summaryTokensSold: _summaryTokensSold,
         saleLookupTables: _openSeaLookupTables,

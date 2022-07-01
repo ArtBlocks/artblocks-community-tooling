@@ -28,7 +28,7 @@ const tokenZeroRepository = new TokenZeroRepository(graphQLDatasource)
 const saleService = new SalesService(salesRepository, tokenZeroRepository)
 
 type Collection = 'curated' | 'playground' | 'factory'
-type Exchange = 'OS_V1' | 'OS_V2' | 'OS' | 'LR_V1'
+type Exchange = 'OS_V1' | 'OS_V2' | 'OS' | 'LR_V1' | 'OS_SP'
 
 type SalesFilter = {
   collectionFilter?: Collection
