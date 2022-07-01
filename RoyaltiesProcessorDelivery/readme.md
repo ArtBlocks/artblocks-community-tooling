@@ -76,7 +76,7 @@ This command processes and summarizes all supported exchanges (currently OpenSea
 - `--osAPI`: gathers sales events from OpenSea's API instead of the subgraph. This relies on OpenSea to have categorized tokens in appropriate collections, collections haven't changed between time of sale and time of query, trusts the data in OpenSea's database, etc. Note that subgraph is still used to enumerate projects on core contract. Also note that project slugs are cached by default, and may be invalidated by deleting the `./slug_cache` directory (clearing cache only required if OpenSea changes a project's collection slug).
   > Note: Using OpenSea API mode only works with `--flagship` or `--contract`. Also `--exchange` must to be set to "OS".
 - `--pbabInvoice`: generates a PBAB invoice detailed report, assuming 2.5% royalties to render provider. Must be filtered down to a single contract via `--contract` command.
-- `--exchange`: Specify the exchange to process the sales from. Supported exchanges are : "OS_V1" for OpenSea Wyvern V1, "OS_V2" for OpenSea Wyvern V2, "OS" for OpenSea Wyvern V1 and V2 or "LR_V1" for Looksrare.
+- `--exchange`: Specify the exchange to process the sales from. Supported exchanges are : "OS_V1" for OpenSea Wyvern V1, "OS_V2" for OpenSea Wyvern V2, "OS" for OpenSea Wyvern V1 and V2, "OS_SP" for Opensea Seaport, or "LR_V1" for Looksrare.
 
 A common example of a query running this command is:
 

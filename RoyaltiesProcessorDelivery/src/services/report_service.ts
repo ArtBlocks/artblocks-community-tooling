@@ -203,7 +203,7 @@ export class ReportService {
     // Build the global CSV header
     let projectReportHeader = `PROJECT NAME${sep}TOTAL SALES${sep}ARTIST ADDRESS${sep}ADDITIONAL ADDRESS`
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
-      projectReportHeader += `${sep}OS_V1 ${crypto} VOLUME${sep}OS_V2 ${crypto} VOLUME${sep}LR_V1 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`
+      projectReportHeader += `${sep}OS_V1 ${crypto} VOLUME${sep}OS_V2 ${crypto} VOLUME${sep}OS_SP ${crypto} VOLUME${sep}LR_V1 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`
     }
 
     let csvData = blocksHeader + projectReportHeader + '\n'
@@ -257,7 +257,7 @@ export class ReportService {
     // Build the global CSV header
     let projectReportHeader = `PROJECT NAME${sep}TOTAL SALES${sep}ARTIST ADDRESS${sep}ADDITIONAL ADDRESS`
     for (const crypto of ART_BLOCKS_PAYMENT_TOKENS) {
-      projectReportHeader += `${sep}OS_V1 ${crypto} VOLUME${sep}OS_V2 ${crypto} VOLUME${sep}LR_V1 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`
+      projectReportHeader += `${sep}OS_V1 ${crypto} VOLUME${sep}OS_V2 ${crypto} VOLUME${sep}OS_SP ${crypto} VOLUME${sep}LR_V1 ${crypto} VOLUME${sep}TOTAL ${crypto} VOLUME${sep}${crypto} FOR ARTIST${sep}${crypto} FOR ADDITIONAL`
     }
 
     let csvData =
@@ -304,6 +304,7 @@ export class ReportService {
       let osV1VolumeReadable = '0.00000'
       let osV2VolumeReadable = '0.00000'
       let looksRareVolumeReadable = '0.00000'
+      let seaportVolumeReadable = '0.00000'
       let totalVolumeReadable = '0.00000'
       let amountToArtistReadable = '0.00000'
       let amountToAdditionalPayeeReadable = '0.00000'
@@ -314,6 +315,7 @@ export class ReportService {
         osV1VolumeReadable = amountHumanReadable(crypto, volume['OS_V1'])
         osV2VolumeReadable = amountHumanReadable(crypto, volume['OS_V2'])
         looksRareVolumeReadable = amountHumanReadable(crypto, volume['LR_V1'])
+        seaportVolumeReadable = amountHumanReadable(crypto, volume['OS_SP'])
         totalVolumeReadable = amountHumanReadable(crypto, volume.total)
         amountToArtistReadable = amountHumanReadable(crypto, toArtist)
         amountToAdditionalPayeeReadable =
@@ -322,7 +324,7 @@ export class ReportService {
             : '0.00000'
       }
 
-      projectReportData += `${sep}${osV1VolumeReadable}${sep}${osV2VolumeReadable}${sep}${looksRareVolumeReadable}${sep}${totalVolumeReadable}${sep}${amountToArtistReadable}${sep}${amountToAdditionalPayeeReadable}`
+      projectReportData += `${sep}${osV1VolumeReadable}${sep}${osV2VolumeReadable}${sep}${seaportVolumeReadable}${sep}${looksRareVolumeReadable}${sep}${totalVolumeReadable}${sep}${amountToArtistReadable}${sep}${amountToAdditionalPayeeReadable}`
     }
 
     return projectReportData + '\n'

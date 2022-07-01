@@ -48,31 +48,39 @@ export class ProjectReport {
 
   addSale(sale: T_Sale, nbTokensSold: number) {
     this.#totalSales += 1
-
-    // The price is divided equally between the number of tokens in the sale
-    const priceAttributedToProject = BigNumber.from(sale.price).div(
-      nbTokensSold
-    )
-    const paymentToken = sale.paymentToken
-
-    // Convert the payment token to human readable name
-    const cryptoName = addressToPaymentToken(paymentToken)
-
-    let volume = this.#paymentTokenVolumes.get(cryptoName)
-    if (volume === undefined) {
-      volume = {
-        total: BigNumber.from(0),
-        OS_V1: BigNumber.from(0),
-        OS_V2: BigNumber.from(0),
-        LR_V1: BigNumber.from(0),
-        OS_Vunknown: BigNumber.from(0), // when using OS API, version is unknown
+    let prices: { [index: string]: number } = {}
+    for (let payment of sale.payments) {
+      if (payment.paymentType !== 'Native' && payment.paymentType !== 'ERC20') {
+        continue
       }
+      prices[payment.paymentToken] += parseInt(payment.price)
     }
 
-    volume.total = volume.total.add(priceAttributedToProject)
-    volume[sale.exchange] = volume[sale.exchange].add(priceAttributedToProject)
+    for (let [paymentToken, price] of Object.entries(prices)) {
+      // The price is divided equally between the number of tokens in the sale
+      const priceAttributedToProject = BigNumber.from(price).div(nbTokensSold)
 
-    this.#paymentTokenVolumes.set(cryptoName, volume)
+      // Convert the payment token to human readable name
+      const cryptoName = addressToPaymentToken(paymentToken)
+
+      let volume = this.#paymentTokenVolumes.get(cryptoName)
+      if (volume === undefined) {
+        volume = {
+          total: BigNumber.from(0),
+          OS_V1: BigNumber.from(0),
+          OS_V2: BigNumber.from(0),
+          LR_V1: BigNumber.from(0),
+          OS_SP: BigNumber.from(0),
+          OS_Vunknown: BigNumber.from(0), // when using OS API, version is unknown
+        }
+      }
+      volume.total = volume.total.add(priceAttributedToProject)
+      volume[sale.exchange] = volume[sale.exchange].add(
+        priceAttributedToProject
+      )
+
+      this.#paymentTokenVolumes.set(cryptoName, volume)
+    }
   }
 
   public get projectId(): number {

@@ -24,16 +24,24 @@ export type T_SaleLookupTable = {
   //sale: T_Sale;
 }
 
+export type T_Payment = {
+  id: string
+  paymentType: 'Native' | 'ERC20' | 'ERC721' | 'ERC1155'
+  paymentToken: string
+  price: string
+  sale: T_Sale
+  recipient: string
+}
+
 export type T_Sale = {
   id: string
-  exchange: 'OS_V1' | 'OS_V2' | 'LR_V1' | 'OS_Vunknown'
+  exchange: 'OS_V1' | 'OS_V2' | 'LR_V1' | 'OS_Vunknown' | 'OS_SP'
   saleType: 'Single' | 'Bundle'
   blockNumber: number
   blockTimestamp: string
   seller: string
   buyer: string
-  paymentToken: string
-  price: string
+  payments: T_Payment[]
   isPrivate: boolean
   summaryTokensSold: string
   saleLookupTables: T_SaleLookupTable[]
