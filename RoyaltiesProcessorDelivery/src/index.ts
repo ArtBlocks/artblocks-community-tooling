@@ -17,6 +17,7 @@ import { T_Sale } from './types/graphQL_entities_def'
 import { exit } from 'process'
 import { TokenZeroRepository } from './repositories/token_zero_repository'
 import { getOpenSeaAssetCollectionSlug } from './repositories/opensea_api'
+import { Exchange, Collection, SalesFilter } from './types/filters'
 
 // import config file of pbab projects on flagship contracts
 import { default as pbabProjectsOnFlagshipConfig } from '../config/pbabProjectsOnFlagship.json'
@@ -27,28 +28,25 @@ const salesRepository = new SalesRepository(graphQLDatasource)
 const tokenZeroRepository = new TokenZeroRepository(graphQLDatasource)
 const saleService = new SalesService(salesRepository, tokenZeroRepository)
 
-type Collection = 'curated' | 'playground' | 'factory'
-type Exchange = 'OS_V1' | 'OS_V2' | 'OS' | 'LR_V1'
-
-type SalesFilter = {
-  collectionFilter?: Collection
-  contractFilterType?: 'ONLY' | 'ONLY_NOT'
-  contractsFilter?: string[]
-  exchangeFilter?: Exchange
-}
-
 const reportService = new ReportService()
 
 function generateFriendlyCsvOutputFilePath(
   command: string,
   previousBlock: number,
   currentBlock: number,
-  useOpenSeaApi: boolean
+  useOpenSeaApi: boolean,
+  salesFilter: SalesFilter
 ): string {
+  const collectionFilterSuffix = salesFilter.collectionFilter
+    ? `_${salesFilter.collectionFilter}`
+    : ''
+  const exchangeFilterSuffix = salesFilter.exchangeFilter
+    ? `_${salesFilter.exchangeFilter}`
+    : ''
   const osApiSuffix = useOpenSeaApi ? '_osAPI' : ''
   return (
     REPORTS_FOLDER +
-    `/${command}_${previousBlock}_${currentBlock}${osApiSuffix}.csv`
+    `/${command}_${previousBlock}_${currentBlock}${collectionFilterSuffix}${exchangeFilterSuffix}${osApiSuffix}.csv`
   )
 }
 
@@ -142,10 +140,14 @@ async function processSales(
       throw 'ONLY filter for subset of contracts is required when using OpenSea API mode'
     }
     // use OpenSea api instead of our subgraph to build an sales object
+    if (exchangeFilter === undefined) {
+      throw 'Exchange filter is required when using OpenSea API mode'
+    }
     sales = await saleService.getAllSalesBetweenBlockNumbersOsApi(
       blockRange,
       salesFilter.contractsFilter,
-      projectIdsToAdd
+      projectIdsToAdd,
+      exchangeFilter
     )
   }
 
@@ -158,10 +160,16 @@ async function processSales(
   )
   let bundleSalesWithMultipleCollectionSlugs = 0
   if (!useOpenSeaApi) {
+    // sales without royalties already not included when in OS API mode
     const filteredSales: T_Sale[] = []
     for (let i = 0; i < sales.length; i++) {
       const _sales = sales[i]
-      if (_sales.exchange !== 'OS_V1' && _sales.exchange !== 'OS_V2') {
+      if (
+        _sales.exchange !== 'OS_V1' &&
+        _sales.exchange !== 'OS_V2' &&
+        _sales.exchange !== 'OS_SP'
+      ) {
+        // filtering logic after this is only for OpenSea bulk sales
         filteredSales.push(_sales)
         continue
       }
@@ -191,6 +199,9 @@ async function processSales(
         ) {
           filteredSales.push(_sales)
         } else {
+          console.log(
+            `[INFO] Skipped bundle sale because multiple OS collection slugs (expect no royalties collected): ${_sales.id}`
+          )
           bundleSalesWithMultipleCollectionSlugs++
         }
       }
@@ -245,7 +256,11 @@ async function processSales(
 
       const exchangeFilterPass =
         exchangeFilter === undefined ||
-        (exchangeFilter === 'OS' && exchange.startsWith('OS_V')) ||
+        // OpenSea API mode filters for exchange before this point
+        useOpenSeaApi ||
+        (exchangeFilter === 'OS_Wyvern' && exchange.startsWith('OS_V')) ||
+        (exchangeFilter === 'OS_Seaport' && exchange == 'OS_SP') ||
+        (exchangeFilter === 'OS_All' && exchange.startsWith('OS_')) ||
         exchangeFilter === exchange
 
       const contractsFilterPass =
@@ -437,7 +452,14 @@ yargs(hideBin(process.argv))
         .option('exchange', {
           description: 'Only the sales coming from a given exchange.',
           type: 'string',
-          choices: ['OS_V1', 'OS_V2', 'OS', 'LR_V1'],
+          choices: [
+            'OS_V1',
+            'OS_V2',
+            'OS_Wyvern',
+            'OS_Seaport',
+            'OS_All',
+            'LR_V1',
+          ],
         })
     },
     async (argv) => {
@@ -470,9 +492,16 @@ yargs(hideBin(process.argv))
         throw 'invalid configuration'
       }
 
-      if (useOpenSeaApi && exchange !== 'OS') {
+      if (
+        useOpenSeaApi &&
+        !(
+          exchange === 'OS_Wyvern' ||
+          exchange === 'OS_Seaport' ||
+          exchange === 'OS_All'
+        )
+      ) {
         console.error(
-          '[ERROR] Exchange filter of OS is required when using OpenSea API mode'
+          '[ERROR] Exchange filter of OS_Wyvern, OS_Seaport, or OS_All is required when using OpenSea API mode'
         )
         throw 'invalid configuration'
       }
@@ -504,7 +533,8 @@ yargs(hideBin(process.argv))
           'since',
           startingBlock,
           endingBlock,
-          useOpenSeaApi
+          useOpenSeaApi,
+          salesFilter
         )
       }
 

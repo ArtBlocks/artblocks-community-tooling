@@ -74,9 +74,15 @@ This command processes and summarizes all supported exchanges (currently OpenSea
 - `--csv`: boolean, output results to csv
 - `--outputPath`: set if override of default output path is desired
 - `--osAPI`: gathers sales events from OpenSea's API instead of the subgraph. This relies on OpenSea to have categorized tokens in appropriate collections, collections haven't changed between time of sale and time of query, trusts the data in OpenSea's database, etc. Note that subgraph is still used to enumerate projects on core contract. Also note that project slugs are cached by default, and may be invalidated by deleting the `./slug_cache` directory (clearing cache only required if OpenSea changes a project's collection slug).
-  > Note: Using OpenSea API mode only works with `--flagship` or `--contract`. Also `--exchange` must to be set to "OS".
+  > Note: Using OpenSea API mode only works with `--flagship` or `--contract`. Also `--exchange` must to be set to either `"OS_Wyvern"`, `"OS_Seaport"`, or `"OS_All"`.
 - `--pbabInvoice`: generates a PBAB invoice detailed report, assuming 2.5% royalties to render provider. Must be filtered down to a single contract via `--contract` command.
-- `--exchange`: Specify the exchange to process the sales from. Supported exchanges are : "OS_V1" for OpenSea Wyvern V1, "OS_V2" for OpenSea Wyvern V2, "OS" for OpenSea Wyvern V1 and V2 or "LR_V1" for Looksrare.
+- `--exchange`: Specify the exchange to process the sales from. Supported exchanges are : 
+  - "OS_V1" for OpenSea Wyvern V1
+  - "OS_V2" for OpenSea Wyvern V2
+  - "OS_Wyvern" for OpenSea Wyvern V1 and V2
+  - "OS_Seaport" for OpenSea Seaport
+  - "OS_All" for OpenSea Wyvern V1, V2, and Seaport
+  - "LR_V1" for Looksrare.
 
 A common example of a query running this command is:
 
@@ -122,6 +128,9 @@ Until properly handled, these assumptions may result in incorrect payment estima
 - _no known bugs at this time_
 
 > When using OpenSea API mode, there are no known bugs at this time. If you discover a new previously unknown bug when using OpenSea API mode, please file a bug in this project's public GitHub repository: https://github.com/ArtBlocks/artblocks-community-tooling/issues
+
+**Potentially Change in Future**:
+> When using OpenSea API mode, we assume when `only_opensea` is false, the only sales returned are from the Wyvern V1 and V2 contracts **AND** the Seaport contracts. This assumption has confirmed to be correct by OpenSea as of July 2022, but there is no promise that this will not change in the future. If this assumption is incorrect, we will need to update the script to filter sales from any additional contracts. Ideally, we depreciate osAPI mode and use subgraph mode instead, in the future.
 
 # Dependencies
 
