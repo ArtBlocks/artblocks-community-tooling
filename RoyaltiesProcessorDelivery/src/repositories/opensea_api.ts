@@ -276,7 +276,7 @@ export async function getOpenSeaSalesEvents(
           headers: headers,
         })
       } catch (error) {}
-      if (!response.ok) {
+      if (!response?.ok) {
         console.warn(
           `[WARN] Error while retrieving sales for collection ${collectionSlug}. Cooling off for 5 seconds to avoid 429 errors.`
         )
