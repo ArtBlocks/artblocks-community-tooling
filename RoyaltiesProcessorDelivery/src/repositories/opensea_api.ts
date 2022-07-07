@@ -214,7 +214,9 @@ function openSeaEventModelToSubgraphModel(
         }
       }
       const _sale: T_Sale = {
-        id: _event.id,
+        // id is slightly different than subgraph schema because we can't know index of
+        // this token sale for a tx that contains many separate purchases
+        id: `${_event.transaction.transaction_hash}-${_event.id}`,
         exchange: 'OS_Vunknown',
         saleType: _saleType,
         blockNumber: _event.transaction.block_number,
