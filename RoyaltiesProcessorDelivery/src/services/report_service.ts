@@ -1,6 +1,7 @@
 import { BigNumber } from 'ethers'
 import { writeFileSync } from 'fs'
 
+import { T_Sale } from '../types/graphQL_entities_def'
 import { ProjectReport } from '../types/project_report'
 import {
   amountHumanReadable,
@@ -347,6 +348,22 @@ export class ReportService {
       csvData += formatedReportData
     }
     console.log(`Raw results written to ${csvOutputFilePath}`)
+    writeFileSync(csvOutputFilePath, csvData)
+  }
+
+  generateDebugCSVFromProjectReports(
+    sales: T_Sale[],
+    csvOutputFilePath: string
+  ): void {
+    const sep = this.#csvSeparator
+
+    let projectReportHeader = `DEBUG - ALL SALE IDS`
+    let csvData = projectReportHeader + '\n'
+
+    for (const sale of sales) {
+      csvData += `${sale.id}\n`
+    }
+    console.log(`DEBUG results written to ${csvOutputFilePath}`)
     writeFileSync(csvOutputFilePath, csvData)
   }
 

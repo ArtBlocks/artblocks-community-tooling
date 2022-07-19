@@ -111,7 +111,8 @@ async function processSales(
   salesFilter: SalesFilter,
   useOpenSeaApi: boolean,
   pbabInvoice: boolean,
-  csvOutputFilePath?: string
+  csvOutputFilePath?: string,
+  debug?: boolean
 ) {
   // apply special cases based on desired filter
   /** Handle excluded projectIds by filtering them out later in this function
@@ -199,7 +200,7 @@ async function processSales(
         ) {
           filteredSales.push(_sales)
         } else {
-          console.log(
+          console.info(
             `[INFO] Skipped bundle sale because multiple OS collection slugs (expect no royalties collected): ${_sales.id}`
           )
           bundleSalesWithMultipleCollectionSlugs++
@@ -376,6 +377,16 @@ async function processSales(
       Array.from(projectReports.values()),
       csvRawOutputFilePath
     )
+    if (debug) {
+      const debugOutputFilePath = csvOutputFilePath.replace(
+        '.csv',
+        '_DEBUG_ALL_SALE_IDS.csv'
+      )
+      reportService.generateDebugCSVFromProjectReports(
+        sales,
+        debugOutputFilePath
+      )
+    }
     return
   }
   // Print output to console
@@ -461,6 +472,11 @@ yargs(hideBin(process.argv))
             'LR_V1',
           ],
         })
+        .option('DEBUG', {
+          description:
+            'If present, a csv file will be output containing all sale IDs for the generated csv reports',
+          type: 'boolean',
+        })
     },
     async (argv) => {
       let startingBlock = argv.startingBlock as number
@@ -471,6 +487,10 @@ yargs(hideBin(process.argv))
 
       let useOpenSeaApi = argv.osAPI as boolean | false
       console.info('[INFO] Use OpenSea API Mode? -> ', !!useOpenSeaApi)
+      let debug = argv.DEBUG as boolean | false
+      if (debug) {
+        console.info('[INFO] Debug Mode Enabled')
+      }
 
       const collection = argv.collection as Collection | undefined
       const exchange = argv.exchange as Exchange | undefined
@@ -549,7 +569,8 @@ yargs(hideBin(process.argv))
         salesFilter,
         !!useOpenSeaApi,
         !!pbabInvoice,
-        outputPath
+        outputPath,
+        debug
       )
     }
   )

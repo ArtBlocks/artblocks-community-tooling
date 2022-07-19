@@ -214,7 +214,9 @@ function openSeaEventModelToSubgraphModel(
         }
       }
       const _sale: T_Sale = {
-        id: _event.id,
+        // id is slightly different than subgraph schema because we can't know index of
+        // this token sale for a tx that contains many separate purchases
+        id: `${_event.transaction.transaction_hash}-${_event.id}`,
         exchange: 'OS_Vunknown',
         saleType: _saleType,
         blockNumber: _event.transaction.block_number,
@@ -274,7 +276,7 @@ export async function getOpenSeaSalesEvents(
           headers: headers,
         })
       } catch (error) {}
-      if (!response.ok) {
+      if (!response?.ok) {
         console.warn(
           `[WARN] Error while retrieving sales for collection ${collectionSlug}. Cooling off for 5 seconds to avoid 429 errors.`
         )
