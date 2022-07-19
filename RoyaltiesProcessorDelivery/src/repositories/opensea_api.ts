@@ -244,12 +244,13 @@ export async function getOpenSeaSalesEvents(
   collectionSlug: string,
   tokenZero: T_TokenZero,
   occurredBeforeTimestamp: number,
-  minBlockNumber: number
+  minBlockNumber: number,
+  only_opensea: boolean
 ): Promise<T_Sale[]> {
   const openSeaSales: T_Sale[] = []
   let _next = ''
   while (true) {
-    let url = `https://api.opensea.io/api/v1/events?only_opensea=true&collection_slug=${collectionSlug}&event_type=successful&occurred_before=${occurredBeforeTimestamp}`
+    let url = `https://api.opensea.io/api/v1/events?only_opensea=${only_opensea}&collection_slug=${collectionSlug}&event_type=successful&occurred_before=${occurredBeforeTimestamp}`
     if (_next !== '') {
       url = url + `&cursor=${_next}`
     }

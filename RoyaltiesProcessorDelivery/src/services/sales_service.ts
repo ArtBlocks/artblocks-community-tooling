@@ -11,6 +11,7 @@ import {
 } from '../repositories/opensea_api'
 import { T_Sale, T_TokenZero } from '../types/graphQL_entities_def'
 import { ProjectReport } from '../types/project_report'
+import { Exchange } from '../types/filters'
 
 const flatCache = require('flat-cache')
 const collectionSlugCache = flatCache.load('collectionSlugCache', '.slug_cache')
@@ -150,7 +151,8 @@ export class SalesService {
   async getAllSalesBetweenBlockNumbersOsApi(
     blockRange: [number, number],
     contracts: string[],
-    projectIdsToAdd: string[]
+    projectIdsToAdd: string[],
+    exchange: Exchange
   ): Promise<T_Sale[]> {
     const first = 1000
     // the thing we are retuning: sales array
@@ -250,18 +252,48 @@ export class SalesService {
 
     // retrieve all events in timestamp/block range, for each collection
     // populate openSeaSales along the way!
-    for (let i = 0; i < slugsAndTokenZeros.length; i++) {
-      const _slugAndTokenZero = slugsAndTokenZeros[i]
-      console.info(
-        `[INFO] Getting OS sale events for: ${_slugAndTokenZero.collectionSlug}`
-      )
-      const _newOpenSeaSales = await getOpenSeaSalesEvents(
-        _slugAndTokenZero.collectionSlug,
-        _slugAndTokenZero.tokenZero,
-        maxTimestamp,
-        blockRange[0]
-      )
-      openSeaSales.push(..._newOpenSeaSales)
+    let only_opensea: boolean[] = []
+    if (exchange === 'OS_Wyvern') {
+      only_opensea = [true]
+    } else if (exchange === 'OS_All') {
+      // per OpenSea for June 2022, includes only Wyvern + Seaport sales, could change in future, but only option for now
+      only_opensea = [false]
+    } else if (exchange === 'OS_Seaport') {
+      // Seaport sales are the sales when only_opensea is false, minus salse wyvern sales when only_opensea is true
+      only_opensea = [false, true]
+    } else {
+      throw 'Invalid exchange when using OpenSea API mode'
+    }
+    // iterate over all variations of only_opensea required to achieve desired end result
+    const _openSeaSales: T_Sale[][] = []
+    for (let i = 0; i < only_opensea.length; i++) {
+      _openSeaSales.push([])
+      // iterate over all collection slugs
+      for (let j = 0; j < slugsAndTokenZeros.length; j++) {
+        const _slugAndTokenZero = slugsAndTokenZeros[j]
+        console.info(
+          `[INFO] Getting OS sale events for: ${_slugAndTokenZero.collectionSlug}`
+        )
+        const _newOpenSeaSales = await getOpenSeaSalesEvents(
+          _slugAndTokenZero.collectionSlug,
+          _slugAndTokenZero.tokenZero,
+          maxTimestamp,
+          blockRange[0],
+          only_opensea[i]
+        )
+        _openSeaSales[i].push(..._newOpenSeaSales)
+      }
+    }
+    // if only seaport, filter out wyvern sales
+    if (exchange === 'OS_Seaport') {
+      openSeaSales = _openSeaSales[0].filter((sale) => {
+        return (
+          _openSeaSales[1].find((_sale) => _sale.id === sale.id) === undefined
+        )
+      })
+    } else {
+      // otherwise, no need to filter because able to be queried directly from OS API
+      openSeaSales = _openSeaSales[0]
     }
 
     return openSeaSales
