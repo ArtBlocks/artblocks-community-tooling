@@ -21,12 +21,18 @@ import { Exchange, Collection, SalesFilter } from './types/filters'
 
 // import config file of pbab projects on flagship contracts
 import { default as pbabProjectsOnFlagshipConfig } from '../config/pbabProjectsOnFlagship.json'
+import { SubgraphRepository } from './repositories/subgraph_repository'
 
 // Instanciate datasources, repositories and services
 const graphQLDatasource = new GraphQLDatasource(URL_GRAPHQL_ENDPOINT)
 const salesRepository = new SalesRepository(graphQLDatasource)
 const tokenZeroRepository = new TokenZeroRepository(graphQLDatasource)
-const saleService = new SalesService(salesRepository, tokenZeroRepository)
+const subgraphRepository = new SubgraphRepository()
+const saleService = new SalesService(
+  salesRepository,
+  tokenZeroRepository,
+  subgraphRepository
+)
 
 const reportService = new ReportService()
 

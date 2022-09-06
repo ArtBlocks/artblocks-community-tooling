@@ -12,6 +12,11 @@ import {
 import { T_Sale, T_TokenZero } from '../types/graphQL_entities_def'
 import { ProjectReport } from '../types/project_report'
 import { Exchange } from '../types/filters'
+import {
+  ProjectData,
+  SubgraphRepository,
+} from '../repositories/subgraph_repository'
+import { getReservoirSalesForProject } from '../repositories/reservoir_api'
 
 const flatCache = require('flat-cache')
 const collectionSlugCache = flatCache.load('collectionSlugCache', '.slug_cache')
@@ -56,13 +61,16 @@ async function getBlockTimestamp(blockNumber) {
 export class SalesService {
   #saleRepository: SalesRepository
   #tokenZeroRepository: TokenZeroRepository
+  #subgraphRepository: SubgraphRepository
 
   constructor(
     saleRepository: SalesRepository,
-    tokenZeroRepository: TokenZeroRepository
+    tokenZeroRepository: TokenZeroRepository,
+    subgraphRepository: SubgraphRepository
   ) {
     this.#saleRepository = saleRepository
     this.#tokenZeroRepository = tokenZeroRepository
+    this.#subgraphRepository = subgraphRepository
   }
 
   static saleHasRoyalties(sale: T_Sale) {
@@ -284,6 +292,81 @@ export class SalesService {
         _openSeaSales[i].push(..._newOpenSeaSales)
       }
     }
+    // if only seaport, filter out wyvern sales
+    if (exchange === 'OS_Seaport') {
+      openSeaSales = _openSeaSales[0].filter((sale) => {
+        return (
+          _openSeaSales[1].find((_sale) => _sale.id === sale.id) === undefined
+        )
+      })
+    } else {
+      // otherwise, no need to filter because able to be queried directly from OS API
+      openSeaSales = _openSeaSales[0]
+    }
+
+    return openSeaSales
+  }
+
+  /**
+   * This function mirrors getAllSalesBetweenBlockNumbers, but uses the Reservoir
+   * API instead of subgraph. Still uses subgraph to get token zero of all
+   * projects, which are required to enumerate collection slugs on OpenSea,
+   * which are required to query sales events.
+   * @param blockRange: start block (inclusive), end block (exclusive)
+   * @param contracts: array of contract addresses (lower case) to inlclude in this search
+   * @param projectIdsToAdd: array of projectIds to include in returned sales
+   */
+  async getAllSalesBetweenBlockNumbersReservoirApi(
+    blockRange: [number, number],
+    contracts: string[],
+    projectIdsToAdd: string[],
+    exchange: Exchange
+  ): Promise<T_Sale[]> {
+    const first = 1000
+    // the thing we are retuning: sales array
+    let reservoirSales: T_Sale[] = []
+    // get token zeros for every project of interest
+    let tokenZeros: T_TokenZero[] = []
+
+    let projectData: ProjectData[] = []
+    projectData = await this.#subgraphRepository.getAllProjectInfo(contracts)
+
+    // Reservoir api works in terms of timestamps, not blocks.
+    let minTimestamp = await getBlockTimestamp(blockRange[0])
+    let maxTimestamp = await getBlockTimestamp(blockRange[1])
+
+    // retrieve all events in timestamp/block range, for each collection
+    // populate sales along the way!
+
+    // iterate over all variations of only_opensea required to achieve desired end result
+    const _reservoirSales: T_Sale[][] = []
+
+    // iterate over all collection slugs
+    let sales = await Promise.all(
+      projectData.map(async (project) => {
+        console.info(
+          `[INFO] Getting Reservoir sale events for: ${project.name}`
+        )
+        const _newReservoirSales = await getReservoirSalesForProject(
+          project,
+          minTimestamp,
+          maxTimestamp
+        )
+        return {
+          // tokenId: token.tokenId ?? undefined,
+          // price: token.price ?? undefined,
+          // platform: token.source ?? undefined,
+          // url: url
+        }
+      })
+    )
+
+    for (let j = 0; j < projectData.length; j++) {
+      const _slugAndTokenZero = slugsAndTokenZeros[j]
+
+      _openSeaSales[i].push(..._newOpenSeaSales)
+    }
+
     // if only seaport, filter out wyvern sales
     if (exchange === 'OS_Seaport') {
       openSeaSales = _openSeaSales[0].filter((sale) => {
