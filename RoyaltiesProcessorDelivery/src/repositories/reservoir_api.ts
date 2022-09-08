@@ -1,7 +1,5 @@
-const sdk = require('api')('@opensea/v1.0#bg4ikl1mk428b')
 import {
   T_Sale,
-  T_TokenZero,
   T_SaleLookupTable,
   T_Token,
 } from '../types/graphQL_entities_def'
@@ -103,82 +101,14 @@ function reservoirSaleModelToSubgraphModel(
     }
   } else {
     // bundle sale
-    // only include bundle sales if all tokens are in same collection
-    // if (
-    //   _event.asset_bundle.assets.every((_asset, _, _asset_bundle) => {
-    //     return _asset.collection.slug === _asset_bundle[0].collection.slug
-    //   })
-    // ) {
-    //   for (let i = 0; i < _event.asset_bundle.assets.length; i++) {
-    //     // only add the assets that are in this collection
-    //     // (since we will get other collections from OS API elsewhere)
-    //     let openSeaCollectionSlug: string =
-    //       _event.asset_bundle.assets[i].collection.slug
-    //     if (
-    //       openSeaCollectionSlug.includes(collectionSlug) &&
-    //       openSeaCollectionSlug !== collectionSlug
-    //     ) {
-    //       console.warn(
-    //         `[WARN] Token id ${_event.asset_bundle.assets[i].token_id} expected in OpenSea collection ${collectionSlug}, but actually in ${openSeaCollectionSlug}. Analyzing as if in expected collection slug: ${collectionSlug} because very similar.`
-    //       )
-    //       console.warn(
-    //         '[WARN] Please contact Devs or OpenSea to have token above moved to correct collection.'
-    //       )
-    //       _event.asset_bundle.assets[i].collection.slug = collectionSlug
-    //     }
-    //     if (_event.asset_bundle.assets[i].collection.slug === collectionSlug) {
-    //       // only push tokens that are in this TokenZero's project
-    //       // (many projects can be in same OS collection)
-    //       if (
-    //         `${
-    //           _event.asset_bundle.assets[i].asset_contract.address
-    //         }-${Math.floor(
-    //           parseInt(_event.asset_bundle.assets[i].token_id) / 1000000
-    //         )}` === tokenZero.id
-    //       ) {
-    //         const _token: T_Token = {
-    //           id: `${tokenZero.tokens[0].contract.id}-${_event.asset_bundle.assets[i].token_id}`,
-    //           tokenId: _event.asset_bundle.assets[i].token_id,
-    //           contract: { ...tokenZero.tokens[0].contract },
-    //           project: { ...tokenZero.tokens[0].project },
-    //         }
-    //         _openSeaLookupTables.push({
-    //           id: `${tokenZero.id}::${_token.id}::${_event.id}`,
-    //           token: _token,
-    //         })
-    //       }
-    //     } else {
-    //       // Unexpected behavior
-    //       console.error(
-    //         `[ERROR] Uniform Bundle sale containing tokens from different collection encountered. Unexpected response from OpenSea API.`
-    //       )
-    //       console.warn(
-    //         `[ERROR] Sale tx hash: ${_event.transaction.transaction_hash}`
-    //       )
-    //       console.info(
-    //         `[ERROR] OS API's reported token collection slug: ${_event.asset_bundle.assets[i].collection.slug}`
-    //       )
-    //       console.info(`[ERROR] expected slug: ${collectionSlug}`)
-    //       throw '[ERROR] Unexpected OS API response - please contact devs'
-    //     }
-    //   }
-    // } else {
-    //   console.warn(
-    //     `[WARN] Unexpected, but have observed - OpenSea api included a bundle sale with tokens in different collection slugs. Skipping, because don't expect OpenSea to have collected Artist royalties. Sale tx hash: ${_event.transaction.transaction_hash}`
-    //   )
-    // }
+    // TODO
   }
-  /**
-   * ref: Example of two squiggles in bulk private sale, OS collected 10%,
-   * so include bulk private sales with all tokens in same collection.
-   * tx: 0x2e3fb6389523431ff3a52f1ccb8a24ab9985b2a8f76730b2432a15150afc110d
-   */
 
-  // complete conversion to subgraph T_OpenSeaSale model
+  // complete conversion to subgraph T_Sale model
   try {
     if (reservoirSale.price?.currency?.contract === null) {
       console.warn(
-        "[WARN] Payment token is NULL from OpenSea's api. " +
+        "[WARN] Payment token is NULL from Reservoir's api. " +
           'This has been observed at least once, and assumption that payment ' +
           'token was ETH was valid. Assuming ETH is payment token, but ' +
           'recommend validating on etherscan.'
@@ -195,7 +125,7 @@ function reservoirSaleModelToSubgraphModel(
       exchange: 'OS_Vunknown',
       saleType: _saleType,
       blockNumber: reservoirSale.block,
-      blockTimestamp: new Date(reservoirSale.timestamp).toUTCString(),
+      blockTimestamp: new Date(reservoirSale.timestamp).toUTCString(), // TODO confirm UTC is correct
       seller: reservoirSale.to,
       buyer: reservoirSale.from,
       paymentToken: reservoirSale.price.currency.contract,
@@ -211,70 +141,6 @@ function reservoirSaleModelToSubgraphModel(
     console.error(reservoirSale.price.currency.contract)
     throw e
   }
-}
-
-// CURRENTLY UNUSED
-// I initially did this implementation before realizing by-contract is a much better way
-// Keeping this around bc I'll probably add specific project query in the future
-export async function getReservoirSalesForProject(
-  projectInfo: ProjectData,
-  startTimestamp: number,
-  endTimestamp: number
-): Promise<T_Sale[]> {
-  const reservoirSales: T_Sale[] = []
-  let _continuation = ''
-  while (true) {
-    let url = `https://api.reservoir.tools/sales/v4?&collection=${projectInfo.reservoirCollectionString}&limit=${SALES_BATCH_SIZE}&startTimestamp=${startTimestamp}&endTimestamp=${endTimestamp}`
-    if (_continuation !== '') {
-      url = url + `&continuation=${_continuation}`
-    }
-    let response: AxiosResponse<SalesResponse>
-    try {
-      response = await axios.get<SalesResponse>(url, {
-        headers: {
-          'x-api-key': RESERVOIR_API_KEY ?? '',
-        },
-        timeout: RESERVOIR_TIMEOUT,
-      })
-    } catch (e) {
-      console.warn(e)
-      delay(500)
-      continue
-    }
-
-    let data = response.data
-
-    data.sales.forEach((sale) => {
-      reservoirSales.push(reservoirSaleModelToSubgraphModel(projectInfo, sale))
-    })
-    if (data.continuation == null) {
-      // reached end of reservoir's pagination
-      break
-    }
-    _continuation = data.continuation
-  }
-
-  // loop through all new sales to check if any before minBlockNumber
-  // if so, skip them, and also we can break out of loop because we are
-  // far enough back in time!
-  let _reachedMinBlockNumber = false
-  const finalReservoirSales: T_Sale[] = []
-  for (let i = 0; i < reservoirSales.length; i++) {
-    // only include if new sale's block is >= minBlock
-    if (Date.parse(reservoirSales[i].blockTimestamp) >= startTimestamp) {
-      finalReservoirSales.push(reservoirSales[i])
-    } else if (reservoirSales[i].blockNumber === null) {
-      // have observed Reservoir API return this for failed transactions
-      // sale did not occur (even though a successful event), so just skip
-      console.debug(
-        `[DEBUG] Skipped failed tx with null block number on collection ${projectInfo.name}`
-      )
-    } else {
-      // valid block number less than min block number, break out of scrolling
-      _reachedMinBlockNumber = true
-    }
-  }
-  return finalReservoirSales
 }
 
 export async function getReservoirSalesForContracts(
