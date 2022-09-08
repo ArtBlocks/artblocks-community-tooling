@@ -57,48 +57,33 @@ function reservoirSaleModelToSubgraphModel(
   // other part of codebase uses length of _summaryTokensSold split by ::
   // to divide up royalty payments on bundle sales, so use same encoding
   let _summaryTokensSold = 'dummy'
-  let _numTokensSold = 1
-  if (_saleType == 'Bundle') {
-    // intentionally begin loop at index 1 because already have 1 loaded
-    // for (let i = 1; i < _event.asset_bundle.assets.length; i++) {
-    //   _summaryTokensSold += '::dummy'
-    //   _numTokensSold++
-    // }
-  }
+
   // Convert token(s) to array of subgraph's T_SaleLookupTable model
   const _reservoirLookupTable: T_SaleLookupTable[] = []
   // populate this with same data as defined in sales_repository.ts
   if (_saleType === 'Single') {
     // single sale
-    // only push tokens that are in this TokenZero's project
-    // (many projects can be in same OS collection)
-    if (
-      `${reservoirSale.token.contract}-${Math.floor(
-        parseInt(reservoirSale.token.tokenId) / 1000000
-      )}` === projectInfo.id
-    ) {
-      const _token: T_Token = {
-        id: `${reservoirSale.token.contract}-${reservoirSale.token.tokenId}`,
-        tokenId: parseInt(reservoirSale.token.tokenId),
-        contract: {
-          id: reservoirSale.token.contract,
-        },
-        project: {
-          id: projectInfo.id,
-          name: projectInfo.name ?? '',
-          artistAddress: projectInfo.artistAddress,
-          curationStatus: 'factory', //projectInfo.curationStatus ?? 'factory',
-          additionalPayee: projectInfo.additionalPayee ?? null,
-          additionalPayeePercentage: projectInfo.additionalPayeePercentage
-            ? parseFloat(projectInfo.additionalPayeePercentage)
-            : null,
-        },
-      }
-      _reservoirLookupTable.push({
-        id: `${projectInfo.id}::${_token.id}::${reservoirSale.id}`,
-        token: _token,
-      })
+    const _token: T_Token = {
+      id: `${reservoirSale.token.contract}-${reservoirSale.token.tokenId}`,
+      tokenId: parseInt(reservoirSale.token.tokenId),
+      contract: {
+        id: reservoirSale.token.contract,
+      },
+      project: {
+        id: projectInfo.id,
+        name: projectInfo.name ?? '',
+        artistAddress: projectInfo.artistAddress,
+        curationStatus: 'factory', //projectInfo.curationStatus ?? 'factory', // TODO: fix curation status
+        additionalPayee: projectInfo.additionalPayee ?? null,
+        additionalPayeePercentage: projectInfo.additionalPayeePercentage
+          ? parseFloat(projectInfo.additionalPayeePercentage)
+          : null,
+      },
     }
+    _reservoirLookupTable.push({
+      id: `${projectInfo.id}::${_token.id}::${reservoirSale.id}`,
+      token: _token,
+    })
   } else {
     // bundle sale
     // TODO
@@ -122,7 +107,7 @@ function reservoirSaleModelToSubgraphModel(
     }
     const _sale: T_Sale = {
       id: reservoirSale.id,
-      exchange: 'OS_Vunknown',
+      exchange: 'OS_Vunknown', // TODO: Write correct exchange
       saleType: _saleType,
       blockNumber: reservoirSale.block,
       blockTimestamp: new Date(reservoirSale.timestamp).toUTCString(), // TODO confirm UTC is correct
@@ -130,7 +115,7 @@ function reservoirSaleModelToSubgraphModel(
       buyer: reservoirSale.from,
       paymentToken: reservoirSale.price.currency.contract,
       price: reservoirSale.price.amount.raw.toString(),
-      isPrivate: false,
+      isPrivate: false, // TODO: handle private sales
       summaryTokensSold: _summaryTokensSold,
       saleLookupTables: _reservoirLookupTable,
     }
@@ -152,6 +137,8 @@ export async function getReservoirSalesForContracts(
   const reservoirSales: T_Sale[] = []
   let _continuation = ''
   let contractsString = '&contract=' + contracts.join('&contract=')
+
+  // Ping the Reservoir API, paginating until we get to the end
   while (true) {
     let url = `https://api.reservoir.tools/sales/v4?${contractsString}&limit=${SALES_BATCH_SIZE}&startTimestamp=${startTimestamp}&endTimestamp=${endTimestamp}`
     if (_continuation !== '') {
@@ -172,7 +159,9 @@ export async function getReservoirSalesForContracts(
     }
 
     let data = response.data
+    // Add every sale to the array
     data.sales.forEach((sale) => {
+      // Get the project info using the dictionart
       const projId = Math.floor(parseInt(sale.token.tokenId) / 1e6)
       const projectKey = `${sale.token.contract}-${projId}`
       reservoirSales.push(
@@ -186,10 +175,7 @@ export async function getReservoirSalesForContracts(
     _continuation = data.continuation
   }
 
-  // loop through all new sales to check if any before minBlockNumber
-  // if so, skip them, and also we can break out of loop because we are
-  // far enough back in time!
-  let _reachedMinBlockNumber = false
+  // loop through all new sales to check if any before minBlockNumber if so, skip them
   const finalReservoirSales: T_Sale[] = []
   for (let i = 0; i < reservoirSales.length; i++) {
     // only include if new sale's block is >= minBlock
@@ -201,9 +187,6 @@ export async function getReservoirSalesForContracts(
       console.debug(
         `[DEBUG] Skipped failed tx with null block number on collection ${reservoirSales[i].id}`
       )
-    } else {
-      // valid block number less than min block number, break out of scrolling
-      _reachedMinBlockNumber = true
     }
   }
   return finalReservoirSales

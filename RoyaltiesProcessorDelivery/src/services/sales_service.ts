@@ -291,9 +291,7 @@ export class SalesService {
 
   /**
    * This function mirrors getAllSalesBetweenBlockNumbers, but uses the Reservoir
-   * API instead of subgraph. Still uses subgraph to get token zero of all
-   * projects, which are required to enumerate collection slugs on OpenSea,
-   * which are required to query sales events.
+   * API instead of subgraph. Still uses subgraph to get all the project info
    * @param blockRange: start block (inclusive), end block (exclusive)
    * @param contracts: array of contract addresses (lower case) to inlclude in this search
    * @param projectIdsToAdd: array of projectIds to include in returned sales
@@ -309,19 +307,16 @@ export class SalesService {
     let minTimestamp = await getBlockTimestamp(blockRange[0])
     let maxTimestamp = await getBlockTimestamp(blockRange[1])
 
-    // retrieve all events in timestamp/block range, for each collection
-    // populate sales along the way!
-
-    // iterate over all variations of only_opensea required to achieve desired end result
+    // create dictionary of project info
     const projectDict = {}
 
-    // create dictionary of project info
     for (let j = 0; j < projectData.length; j++) {
       const projectInfo = projectData[j]
       projectDict[`${projectInfo.contractAddress}-${projectInfo.projectId}`] =
         projectInfo
     }
 
+    // Get the sales data from Reservoir!
     const _reservoirSales = await getReservoirSalesForContracts(
       contracts,
       projectDict,
