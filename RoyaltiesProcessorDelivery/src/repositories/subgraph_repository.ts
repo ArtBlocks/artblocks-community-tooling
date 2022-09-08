@@ -1,6 +1,5 @@
+const fetch = require('node-fetch')
 import { Client, fetchExchange, cacheExchange, dedupExchange } from 'urql/core'
-import { retryExchange } from '@urql/exchange-retry'
-import { RetryExchangeOptions } from '@urql/exchange-retry/dist/types/retryExchange'
 import {
   GetProjectsInfoQuery,
   GetProjectsInfoQueryVariables,
@@ -26,20 +25,9 @@ export class SubgraphRepository {
   client: Client
 
   constructor() {
-    const retryOptions: RetryExchangeOptions = {
-      maxNumberAttempts: 3,
-      retryIf: (error) => !!error,
-    }
-
     this.client = new Client({
       url: 'https://api.thegraph.com/subgraphs/name/artblocks/art-blocks',
-      fetch: fetch as any,
-      exchanges: [
-        dedupExchange,
-        cacheExchange,
-        retryExchange(retryOptions),
-        fetchExchange,
-      ],
+      fetch: fetch,
       fetchOptions: {},
     })
   }
@@ -95,7 +83,7 @@ export class SubgraphRepository {
           additionalPayee: project.additionalPayee,
           additionalPayeePercentage: project.additionalPayeePercentage,
           curationStatus: project.curationStatus,
-          reservoirCollectionString: `${project.contract.id}:${startTokenId}-${endTokenId}`,
+          reservoirCollectionString: `${project.contract.id}%3A${startTokenId}%3A${endTokenId}`,
         })
       })
 

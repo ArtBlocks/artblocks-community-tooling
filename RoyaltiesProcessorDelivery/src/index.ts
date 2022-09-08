@@ -116,6 +116,7 @@ async function processSales(
   blockRange: [number, number],
   salesFilter: SalesFilter,
   useOpenSeaApi: boolean,
+  useReservoirApi: boolean,
   pbabInvoice: boolean,
   csvOutputFilePath?: string
 ) {
@@ -134,9 +135,21 @@ async function processSales(
   const exchangeFilter = salesFilter.exchangeFilter
 
   let sales: T_Sale[]
-  if (!useOpenSeaApi) {
+  if (!useOpenSeaApi && !useReservoirApi) {
     // get all sales of all tokens in blockrange in subgraph from subgraph
     sales = await saleService.getAllSalesBetweenBlockNumbers(blockRange)
+  } else if (useReservoirApi) {
+    if (
+      salesFilter.contractFilterType !== 'ONLY' ||
+      salesFilter.contractsFilter === undefined
+    ) {
+      throw 'ONLY filter for subset of contracts is required when using OpenSea API mode'
+    }
+    sales = await saleService.getAllSalesBetweenBlockNumbersReservoirApi(
+      blockRange,
+      salesFilter.contractsFilter,
+      projectIdsToAdd
+    )
   } else {
     // require an ONLY filter and a contractsFilter in OS API mode
     if (
@@ -446,7 +459,13 @@ yargs(hideBin(process.argv))
           description:
             'If present, the OpenSea api will be used instead of the subgraph. requires either: --flagship OR --contract.',
           type: 'boolean',
-          conflicts: ['collection', 'PBAB'],
+          conflicts: ['collection', 'PBAB', 'reservoirAPI'],
+        })
+        .option('reservoirAPI', {
+          description:
+            'If present, the Reservoir api will be used instead of the subgraph. requires either: --flagship OR --contract.',
+          type: 'boolean',
+          conflicts: ['collection', 'PBAB', 'osAPI'],
         })
         .option('pbabInvoice', {
           description:
@@ -478,6 +497,9 @@ yargs(hideBin(process.argv))
       let useOpenSeaApi = argv.osAPI as boolean | false
       console.info('[INFO] Use OpenSea API Mode? -> ', !!useOpenSeaApi)
 
+      let useReservoirApi = argv.reservoirAPI as boolean | false
+      console.info('[INFO] Use Reservoir API Mode? -> ', !!useReservoirApi)
+
       const collection = argv.collection as Collection | undefined
       const exchange = argv.exchange as Exchange | undefined
       let salesFilter: SalesFilter = {
@@ -494,6 +516,13 @@ yargs(hideBin(process.argv))
       if (useOpenSeaApi && !flagship && !contract) {
         console.error(
           '[ERROR] OpenSea API mode currently only supports --flagship or --contract mode'
+        )
+        throw 'invalid configuration'
+      }
+
+      if (useReservoirApi && !flagship && !contract) {
+        console.error(
+          '[ERROR] Reservoir API mode currently only supports --flagship or --contract mode'
         )
         throw 'invalid configuration'
       }
@@ -554,6 +583,7 @@ yargs(hideBin(process.argv))
         [startingBlock, endingBlock],
         salesFilter,
         !!useOpenSeaApi,
+        !!useReservoirApi,
         !!pbabInvoice,
         outputPath
       )

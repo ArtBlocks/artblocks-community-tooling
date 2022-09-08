@@ -1,4 +1,4 @@
-import { BigNumber } from 'ethers'
+import { BigNumber, ethers } from 'ethers'
 import { BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES } from '../constant'
 import fetch from 'node-fetch'
 
@@ -319,8 +319,7 @@ export class SalesService {
   async getAllSalesBetweenBlockNumbersReservoirApi(
     blockRange: [number, number],
     contracts: string[],
-    projectIdsToAdd: string[],
-    exchange: Exchange
+    projectIdsToAdd: string[]
   ): Promise<T_Sale[]> {
     const first = 1000
     // the thing we are retuning: sales array
@@ -339,47 +338,23 @@ export class SalesService {
     // populate sales along the way!
 
     // iterate over all variations of only_opensea required to achieve desired end result
-    const _reservoirSales: T_Sale[][] = []
+    const _reservoirSales: T_Sale[] = []
 
     // iterate over all collection slugs
-    let sales = await Promise.all(
-      projectData.map(async (project) => {
-        console.info(
-          `[INFO] Getting Reservoir sale events for: ${project.name}`
-        )
-        const _newReservoirSales = await getReservoirSalesForProject(
-          project,
-          minTimestamp,
-          maxTimestamp
-        )
-        return {
-          // tokenId: token.tokenId ?? undefined,
-          // price: token.price ?? undefined,
-          // platform: token.source ?? undefined,
-          // url: url
-        }
-      })
-    )
-
     for (let j = 0; j < projectData.length; j++) {
-      const _slugAndTokenZero = slugsAndTokenZeros[j]
-
-      _openSeaSales[i].push(..._newOpenSeaSales)
+      const projectInfo = projectData[j]
+      console.info(
+        `[INFO] Getting Reservoir sale events for: ${projectInfo.name}`
+      )
+      const _newReservoirSales = await getReservoirSalesForProject(
+        projectInfo,
+        minTimestamp,
+        maxTimestamp
+      )
+      _reservoirSales.push(..._newReservoirSales)
     }
 
-    // if only seaport, filter out wyvern sales
-    if (exchange === 'OS_Seaport') {
-      openSeaSales = _openSeaSales[0].filter((sale) => {
-        return (
-          _openSeaSales[1].find((_sale) => _sale.id === sale.id) === undefined
-        )
-      })
-    } else {
-      // otherwise, no need to filter because able to be queried directly from OS API
-      openSeaSales = _openSeaSales[0]
-    }
-
-    return openSeaSales
+    return _reservoirSales
   }
 
   generateProjectReports(sales: T_Sale[]): Map<string, ProjectReport> {
