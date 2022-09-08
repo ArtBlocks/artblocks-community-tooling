@@ -147,8 +147,7 @@ async function processSales(
     }
     sales = await saleService.getAllSalesBetweenBlockNumbersReservoirApi(
       blockRange,
-      salesFilter.contractsFilter,
-      projectIdsToAdd
+      salesFilter.contractsFilter
     )
   } else {
     // require an ONLY filter and a contractsFilter in OS API mode
@@ -178,7 +177,7 @@ async function processSales(
     '[INFO] Getting OpenSea collection slugs for tokens in bundle sales... (cached upon receipt)'
   )
   let bundleSalesWithMultipleCollectionSlugs = 0
-  if (!useOpenSeaApi) {
+  if (!useOpenSeaApi && !useReservoirApi) {
     // sales without royalties already not included when in OS API mode
     const filteredSales: T_Sale[] = []
     for (let i = 0; i < sales.length; i++) {
@@ -277,6 +276,7 @@ async function processSales(
         exchangeFilter === undefined ||
         // OpenSea API mode filters for exchange before this point
         useOpenSeaApi ||
+        useReservoirApi ||
         (exchangeFilter === 'OS_Wyvern' && exchange.startsWith('OS_V')) ||
         (exchangeFilter === 'OS_Seaport' && exchange == 'OS_SP') ||
         (exchangeFilter === 'OS_All' && exchange.startsWith('OS_')) ||

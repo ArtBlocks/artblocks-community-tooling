@@ -7,7 +7,7 @@ import {
 } from '../types/graphQL_entities_def'
 import { delay } from '../utils/util_functions'
 import { ProjectData } from './subgraph_repository'
-import axios from 'axios'
+import axios, { AxiosResponse } from 'axios'
 
 require('dotenv').config()
 
@@ -46,7 +46,7 @@ type ReservoirSaleEvent = {
     }
   }
 }
-type ProjectCollectionResponse = {
+type SalesResponse = {
   sales: ReservoirSaleEvent[]
   continuation: string | null
 }
@@ -199,7 +199,7 @@ function reservoirSaleModelToSubgraphModel(
       seller: reservoirSale.to,
       buyer: reservoirSale.from,
       paymentToken: reservoirSale.price.currency.contract,
-      price: reservoirSale.price.amount.decimal.toString(),
+      price: reservoirSale.price.amount.raw.toString(),
       isPrivate: false,
       summaryTokensSold: _summaryTokensSold,
       saleLookupTables: _reservoirLookupTable,
@@ -213,9 +213,9 @@ function reservoirSaleModelToSubgraphModel(
   }
 }
 
-// returns OpenSea sales events for a given collection slug between timestamp
-// bound (exclusive).
-// only returns sales performed on OpenSea's contracts.
+// CURRENTLY UNUSED
+// I initially did this implementation before realizing by-contract is a much better way
+// Keeping this around bc I'll probably add specific project query in the future
 export async function getReservoirSalesForProject(
   projectInfo: ProjectData,
   startTimestamp: number,
@@ -228,13 +228,20 @@ export async function getReservoirSalesForProject(
     if (_continuation !== '') {
       url = url + `&continuation=${_continuation}`
     }
+    let response: AxiosResponse<SalesResponse>
+    try {
+      response = await axios.get<SalesResponse>(url, {
+        headers: {
+          'x-api-key': RESERVOIR_API_KEY ?? '',
+        },
+        timeout: RESERVOIR_TIMEOUT,
+      })
+    } catch (e) {
+      console.warn(e)
+      delay(500)
+      continue
+    }
 
-    let response = await axios.get<ProjectCollectionResponse>(url, {
-      headers: {
-        'x-api-key': RESERVOIR_API_KEY ?? '',
-      },
-      timeout: RESERVOIR_TIMEOUT,
-    })
     let data = response.data
 
     data.sales.forEach((sale) => {
@@ -261,6 +268,72 @@ export async function getReservoirSalesForProject(
       // sale did not occur (even though a successful event), so just skip
       console.debug(
         `[DEBUG] Skipped failed tx with null block number on collection ${projectInfo.name}`
+      )
+    } else {
+      // valid block number less than min block number, break out of scrolling
+      _reachedMinBlockNumber = true
+    }
+  }
+  return finalReservoirSales
+}
+
+export async function getReservoirSalesForContracts(
+  contracts: string[],
+  projectInfo: Record<string, ProjectData>,
+  startTimestamp: number,
+  endTimestamp: number
+): Promise<T_Sale[]> {
+  const reservoirSales: T_Sale[] = []
+  let _continuation = ''
+  let contractsString = '&contract=' + contracts.join('&contract=')
+  while (true) {
+    let url = `https://api.reservoir.tools/sales/v4?${contractsString}&limit=${SALES_BATCH_SIZE}&startTimestamp=${startTimestamp}&endTimestamp=${endTimestamp}`
+    if (_continuation !== '') {
+      url = url + `&continuation=${_continuation}`
+    }
+    let response: AxiosResponse<SalesResponse>
+    try {
+      response = await axios.get<SalesResponse>(url, {
+        headers: {
+          'x-api-key': RESERVOIR_API_KEY ?? '',
+        },
+        timeout: RESERVOIR_TIMEOUT,
+      })
+    } catch (e) {
+      console.warn(e)
+      delay(500)
+      continue
+    }
+
+    let data = response.data
+    data.sales.forEach((sale) => {
+      const projId = Math.floor(parseInt(sale.token.tokenId) / 1e6)
+      const projectKey = `${sale.token.contract}-${projId}`
+      reservoirSales.push(
+        reservoirSaleModelToSubgraphModel(projectInfo[projectKey], sale)
+      )
+    })
+    if (data.continuation == null) {
+      // reached end of reservoir's pagination
+      break
+    }
+    _continuation = data.continuation
+  }
+
+  // loop through all new sales to check if any before minBlockNumber
+  // if so, skip them, and also we can break out of loop because we are
+  // far enough back in time!
+  let _reachedMinBlockNumber = false
+  const finalReservoirSales: T_Sale[] = []
+  for (let i = 0; i < reservoirSales.length; i++) {
+    // only include if new sale's block is >= minBlock
+    if (Date.parse(reservoirSales[i].blockTimestamp) >= startTimestamp) {
+      finalReservoirSales.push(reservoirSales[i])
+    } else if (reservoirSales[i].blockNumber === null) {
+      // have observed Reservoir API return this for failed transactions
+      // sale did not occur (even though a successful event), so just skip
+      console.debug(
+        `[DEBUG] Skipped failed tx with null block number on collection ${reservoirSales[i].id}`
       )
     } else {
       // valid block number less than min block number, break out of scrolling

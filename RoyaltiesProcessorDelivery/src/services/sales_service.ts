@@ -16,7 +16,7 @@ import {
   ProjectData,
   SubgraphRepository,
 } from '../repositories/subgraph_repository'
-import { getReservoirSalesForProject } from '../repositories/reservoir_api'
+import { getReservoirSalesForContracts } from '../repositories/reservoir_api'
 
 const flatCache = require('flat-cache')
 const collectionSlugCache = flatCache.load('collectionSlugCache', '.slug_cache')
@@ -34,28 +34,10 @@ async function getBlockTimestamp(blockNumber) {
   let retries = 0
   const maxRetries = 5
   let data: any
-  while (!success) {
-    const response = await fetch(
-      `https://api.etherscan.io/api?module=block&action=getblockreward&blockno=${blockNumber}`
-    )
-    data = await response.json()
-    if (data.result.timeStamp !== undefined) {
-      success = true
-    } else {
-      if (retries >= maxRetries) {
-        console.error(
-          `[ERROR] reached maximum retries when getting block timestamp via etherscan api for block number ${blockNumber}`
-        )
-        throw '[ERROR] exiting due to etherscan api failure'
-      }
-      retries++
-      console.warn(
-        `[WARN] Etherscan API failure... Retry ${retries} of ${maxRetries}...`
-      )
-      await delay(5000)
-    }
-  }
-  return parseInt(data.result.timeStamp)
+  const provider = new ethers.providers.AlchemyProvider('homestead')
+
+  const timestamp = (await provider.getBlock(blockNumber)).timestamp
+  return timestamp
 }
 
 export class SalesService {
@@ -318,15 +300,8 @@ export class SalesService {
    */
   async getAllSalesBetweenBlockNumbersReservoirApi(
     blockRange: [number, number],
-    contracts: string[],
-    projectIdsToAdd: string[]
+    contracts: string[]
   ): Promise<T_Sale[]> {
-    const first = 1000
-    // the thing we are retuning: sales array
-    let reservoirSales: T_Sale[] = []
-    // get token zeros for every project of interest
-    let tokenZeros: T_TokenZero[] = []
-
     let projectData: ProjectData[] = []
     projectData = await this.#subgraphRepository.getAllProjectInfo(contracts)
 
@@ -338,21 +313,21 @@ export class SalesService {
     // populate sales along the way!
 
     // iterate over all variations of only_opensea required to achieve desired end result
-    const _reservoirSales: T_Sale[] = []
+    const projectDict = {}
 
-    // iterate over all collection slugs
+    // create dictionary of project info
     for (let j = 0; j < projectData.length; j++) {
       const projectInfo = projectData[j]
-      console.info(
-        `[INFO] Getting Reservoir sale events for: ${projectInfo.name}`
-      )
-      const _newReservoirSales = await getReservoirSalesForProject(
-        projectInfo,
-        minTimestamp,
-        maxTimestamp
-      )
-      _reservoirSales.push(..._newReservoirSales)
+      projectDict[`${projectInfo.contractAddress}-${projectInfo.projectId}`] =
+        projectInfo
     }
+
+    const _reservoirSales = await getReservoirSalesForContracts(
+      contracts,
+      projectDict,
+      minTimestamp,
+      maxTimestamp
+    )
 
     return _reservoirSales
   }
