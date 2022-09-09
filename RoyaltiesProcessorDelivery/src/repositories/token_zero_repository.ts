@@ -32,6 +32,28 @@ const QUERY_GET_TOKEN_ZEROS = gql`
   }
 `
 
+const QUERY_GET_PROJECT_INFO = gql`
+  query getTokenZeros($first: Int!, $skip: Int!) {
+    projects(
+      first: $first
+      skip: $skip
+      orderBy: projectId
+      where: WHERE_CLAUSE
+    ) {
+      id
+      curationStatus
+      contract {
+        id
+      }
+      name
+      artistAddress
+      additionalPayee
+      additionalPayeePercentage
+      invocations
+    }
+  }
+`
+
 type T_QueryVariable_GetTokenZeros = {
   first: number
   skip: number
@@ -73,6 +95,19 @@ export class TokenZeroRepository {
     const query = QUERY_GET_TOKEN_ZEROS.replace(
       'WHERE_CLAUSE',
       `{ invocations_not: 0, id_in: [${projectIdsQuery}] }`
+    )
+    const resp = await this.#graphQLDatasource.query(query, variables)
+    return resp.projects as T_TokenZero[]
+  }
+
+  async getAllProjectInfoForContracts(
+    variables: T_QueryVariable_GetTokenZeros,
+    contracts: string[]
+  ): Promise<T_TokenZero[]> {
+    const contractsQuery = contracts.map((_contractId) => `"${_contractId}"`)
+    const query = QUERY_GET_TOKEN_ZEROS.replace(
+      'WHERE_CLAUSE',
+      `{ invocations_not: 0, contract_in: [${contractsQuery}] }`
     )
     const resp = await this.#graphQLDatasource.query(query, variables)
     return resp.projects as T_TokenZero[]

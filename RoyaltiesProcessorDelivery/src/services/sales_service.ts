@@ -1,4 +1,4 @@
-import { BigNumber } from 'ethers'
+import { BigNumber, ethers } from 'ethers'
 import { BLOCK_WHERE_PRIVATE_SALES_HAVE_ROYALTIES } from '../constant'
 import fetch from 'node-fetch'
 
@@ -12,6 +12,11 @@ import {
 import { T_Sale, T_TokenZero } from '../types/graphQL_entities_def'
 import { ProjectReport } from '../types/project_report'
 import { Exchange } from '../types/filters'
+import {
+  ProjectData,
+  SubgraphRepository,
+} from '../repositories/subgraph_repository'
+import { getReservoirSalesForContracts } from '../repositories/reservoir_api'
 
 const flatCache = require('flat-cache')
 const collectionSlugCache = flatCache.load('collectionSlugCache', '.slug_cache')
@@ -29,40 +34,25 @@ async function getBlockTimestamp(blockNumber) {
   let retries = 0
   const maxRetries = 5
   let data: any
-  while (!success) {
-    const response = await fetch(
-      `https://api.etherscan.io/api?module=block&action=getblockreward&blockno=${blockNumber}`
-    )
-    data = await response.json()
-    if (data.result.timeStamp !== undefined) {
-      success = true
-    } else {
-      if (retries >= maxRetries) {
-        console.error(
-          `[ERROR] reached maximum retries when getting block timestamp via etherscan api for block number ${blockNumber}`
-        )
-        throw '[ERROR] exiting due to etherscan api failure'
-      }
-      retries++
-      console.warn(
-        `[WARN] Etherscan API failure... Retry ${retries} of ${maxRetries}...`
-      )
-      await delay(5000)
-    }
-  }
-  return parseInt(data.result.timeStamp)
+  const provider = new ethers.providers.AlchemyProvider('homestead')
+
+  const timestamp = (await provider.getBlock(blockNumber)).timestamp
+  return timestamp
 }
 
 export class SalesService {
   #saleRepository: SalesRepository
   #tokenZeroRepository: TokenZeroRepository
+  #subgraphRepository: SubgraphRepository
 
   constructor(
     saleRepository: SalesRepository,
-    tokenZeroRepository: TokenZeroRepository
+    tokenZeroRepository: TokenZeroRepository,
+    subgraphRepository: SubgraphRepository
   ) {
     this.#saleRepository = saleRepository
     this.#tokenZeroRepository = tokenZeroRepository
+    this.#subgraphRepository = subgraphRepository
   }
 
   static saleHasRoyalties(sale: T_Sale) {
@@ -297,6 +287,44 @@ export class SalesService {
     }
 
     return openSeaSales
+  }
+
+  /**
+   * This function mirrors getAllSalesBetweenBlockNumbers, but uses the Reservoir
+   * API instead of subgraph. Still uses subgraph to get all the project info
+   * @param blockRange: start block (inclusive), end block (exclusive)
+   * @param contracts: array of contract addresses (lower case) to inlclude in this search
+   * @param projectIdsToAdd: array of projectIds to include in returned sales
+   */
+  async getAllSalesBetweenBlockNumbersReservoirApi(
+    blockRange: [number, number],
+    contracts: string[]
+  ): Promise<T_Sale[]> {
+    let projectData: ProjectData[] = []
+    projectData = await this.#subgraphRepository.getAllProjectInfo(contracts)
+
+    // Reservoir api works in terms of timestamps, not blocks.
+    let minTimestamp = await getBlockTimestamp(blockRange[0])
+    let maxTimestamp = await getBlockTimestamp(blockRange[1])
+
+    // create dictionary of project info
+    const projectDict = {}
+
+    for (let j = 0; j < projectData.length; j++) {
+      const projectInfo = projectData[j]
+      projectDict[`${projectInfo.contractAddress}-${projectInfo.projectId}`] =
+        projectInfo
+    }
+
+    // Get the sales data from Reservoir!
+    const _reservoirSales = await getReservoirSalesForContracts(
+      contracts,
+      projectDict,
+      minTimestamp,
+      maxTimestamp
+    )
+
+    return _reservoirSales
   }
 
   generateProjectReports(sales: T_Sale[]): Map<string, ProjectReport> {

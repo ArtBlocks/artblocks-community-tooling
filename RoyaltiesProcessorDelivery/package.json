@@ -4,26 +4,36 @@
   "main": "index.js",
   "scripts": {
     "start": "./node_modules/.bin/ts-node src/index.ts",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "codegen": "graphql-codegen --config ./src/graphql.config.js"
   },
   "author": "Art Blocks, Inc.",
   "license": "MIT",
   "description": "",
   "devDependencies": {
+    "@graphql-codegen/cli": "^1.21.3",
+    "@graphql-codegen/typescript": "1.21.1",
+    "@graphql-codegen/typescript-document-nodes": "1.17.10",
+    "@graphql-codegen/typescript-operations": "1.17.15",
+    "@graphql-codegen/typescript-urql": "^2.0.4",
     "@types/node": "^16.0.0",
     "@types/yargs": "^17.0.2",
     "typescript": "^4.3.5"
   },
   "dependencies": {
+    "@urql/exchange-retry": "^0.2.1",
     "api": "^4.3.0",
+    "axios": "^0.27.2",
     "dotenv": "^16.0.0",
     "ethers": "^5.5.4",
     "flat-cache": "^3.0.4",
-    "graphql": "^16.2.0",
+    "graphql": "^15.7.2",
     "graphql-request": "^3.4.0",
+    "graphql-tag": "^2.12.6",
     "node-fetch": "^2.6.1",
     "prettier": "^2.7.1",
     "ts-node": "^10.4.0",
+    "urql": "^2.2.3",
     "yargs": "^17.0.1"
   }
 }

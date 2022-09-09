@@ -1,0 +1,20 @@
+query getProjectsInfo($first: Int!, $skip: Int!, $contracts: [String!]!) {
+  projects(
+    first: $first
+    skip: $skip
+    orderBy: projectId
+    where: { invocations_not: 0, contract_in: $contracts }
+  ) {
+    id
+    projectId
+    curationStatus
+    contract {
+      id
+    }
+    name
+    artistAddress
+    additionalPayee
+    additionalPayeePercentage
+    invocations
+  }
+}

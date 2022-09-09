@@ -21,12 +21,18 @@ import { Exchange, Collection, SalesFilter } from './types/filters'
 
 // import config file of pbab projects on flagship contracts
 import { default as pbabProjectsOnFlagshipConfig } from '../config/pbabProjectsOnFlagship.json'
+import { SubgraphRepository } from './repositories/subgraph_repository'
 
 // Instanciate datasources, repositories and services
 const graphQLDatasource = new GraphQLDatasource(URL_GRAPHQL_ENDPOINT)
 const salesRepository = new SalesRepository(graphQLDatasource)
 const tokenZeroRepository = new TokenZeroRepository(graphQLDatasource)
-const saleService = new SalesService(salesRepository, tokenZeroRepository)
+const subgraphRepository = new SubgraphRepository()
+const saleService = new SalesService(
+  salesRepository,
+  tokenZeroRepository,
+  subgraphRepository
+)
 
 const reportService = new ReportService()
 
@@ -110,6 +116,7 @@ async function processSales(
   blockRange: [number, number],
   salesFilter: SalesFilter,
   useOpenSeaApi: boolean,
+  useReservoirApi: boolean,
   pbabInvoice: boolean,
   csvOutputFilePath?: string
 ) {
@@ -128,9 +135,20 @@ async function processSales(
   const exchangeFilter = salesFilter.exchangeFilter
 
   let sales: T_Sale[]
-  if (!useOpenSeaApi) {
+  if (!useOpenSeaApi && !useReservoirApi) {
     // get all sales of all tokens in blockrange in subgraph from subgraph
     sales = await saleService.getAllSalesBetweenBlockNumbers(blockRange)
+  } else if (useReservoirApi) {
+    if (
+      salesFilter.contractFilterType !== 'ONLY' ||
+      salesFilter.contractsFilter === undefined
+    ) {
+      throw 'ONLY filter for subset of contracts is required when using OpenSea API mode'
+    }
+    sales = await saleService.getAllSalesBetweenBlockNumbersReservoirApi(
+      blockRange,
+      salesFilter.contractsFilter
+    )
   } else {
     // require an ONLY filter and a contractsFilter in OS API mode
     if (
@@ -159,7 +177,7 @@ async function processSales(
     '[INFO] Getting OpenSea collection slugs for tokens in bundle sales... (cached upon receipt)'
   )
   let bundleSalesWithMultipleCollectionSlugs = 0
-  if (!useOpenSeaApi) {
+  if (!useOpenSeaApi && !useReservoirApi) {
     // sales without royalties already not included when in OS API mode
     const filteredSales: T_Sale[] = []
     for (let i = 0; i < sales.length; i++) {
@@ -258,6 +276,7 @@ async function processSales(
         exchangeFilter === undefined ||
         // OpenSea API mode filters for exchange before this point
         useOpenSeaApi ||
+        useReservoirApi ||
         (exchangeFilter === 'OS_Wyvern' && exchange.startsWith('OS_V')) ||
         (exchangeFilter === 'OS_Seaport' && exchange == 'OS_SP') ||
         (exchangeFilter === 'OS_All' && exchange.startsWith('OS_')) ||
@@ -440,7 +459,13 @@ yargs(hideBin(process.argv))
           description:
             'If present, the OpenSea api will be used instead of the subgraph. requires either: --flagship OR --contract.',
           type: 'boolean',
-          conflicts: ['collection', 'PBAB'],
+          conflicts: ['collection', 'PBAB', 'reservoirAPI'],
+        })
+        .option('reservoirAPI', {
+          description:
+            'If present, the Reservoir api will be used instead of the subgraph. requires either: --flagship OR --contract.',
+          type: 'boolean',
+          conflicts: ['collection', 'PBAB', 'osAPI'],
         })
         .option('pbabInvoice', {
           description:
@@ -472,6 +497,9 @@ yargs(hideBin(process.argv))
       let useOpenSeaApi = argv.osAPI as boolean | false
       console.info('[INFO] Use OpenSea API Mode? -> ', !!useOpenSeaApi)
 
+      let useReservoirApi = argv.reservoirAPI as boolean | false
+      console.info('[INFO] Use Reservoir API Mode? -> ', !!useReservoirApi)
+
       const collection = argv.collection as Collection | undefined
       const exchange = argv.exchange as Exchange | undefined
       let salesFilter: SalesFilter = {
@@ -488,6 +516,13 @@ yargs(hideBin(process.argv))
       if (useOpenSeaApi && !flagship && !contract) {
         console.error(
           '[ERROR] OpenSea API mode currently only supports --flagship or --contract mode'
+        )
+        throw 'invalid configuration'
+      }
+
+      if (useReservoirApi && !flagship && !contract) {
+        console.error(
+          '[ERROR] Reservoir API mode currently only supports --flagship or --contract mode'
         )
         throw 'invalid configuration'
       }
@@ -548,6 +583,7 @@ yargs(hideBin(process.argv))
         [startingBlock, endingBlock],
         salesFilter,
         !!useOpenSeaApi,
+        !!useReservoirApi,
         !!pbabInvoice,
         outputPath
       )
