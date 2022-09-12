@@ -30,10 +30,6 @@ type T_SlugAndTokenZero = {
  * This gets timestamp for a given block number via fetch of etherscan api
  */
 async function getBlockTimestamp(blockNumber) {
-  let success = false
-  let retries = 0
-  const maxRetries = 5
-  let data: any
   const provider = new ethers.providers.AlchemyProvider('homestead')
 
   const timestamp = (await provider.getBlock(blockNumber)).timestamp
