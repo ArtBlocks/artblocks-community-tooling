@@ -26,7 +26,7 @@ export function addressToPaymentToken(address: string) {
       return 'ABST'
 
     default:
-      console.error(`UNKNOW PAYMENT TOKEN ${address}, ABANDON !`)
+      console.error(`UNKNOWN PAYMENT TOKEN ${address}, ABANDON!`)
       process.exit(-1)
   }
 }
@@ -49,7 +49,7 @@ export function amountHumanReadable(crypto: string, amount: BigNumber): string {
       return amount.div(10_000).toNumber().toFixed(3)
 
     default:
-      console.error(`UNKNOW CRYPTO ${crypto}, ABANDON !`)
+      console.error(`UNKNOWN CRYPTO ${crypto}, ABANDON!`)
       process.exit(-1)
   }
 }
