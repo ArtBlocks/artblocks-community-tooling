@@ -5,8 +5,9 @@ export const WETH_ADDR = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2'
 export const USDC_ADDR = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'
 export const DAI_ADDR = '0x6b175474e89094c44da98b954eedeac495271d0f'
 export const ABST_ADDR = '0x2feb105fbb4c922597b125c56822b3db7351b55d'
+export const RARI_ADDR = '0xfca59cd816ab1ead66534d82bc21e7515ce441cf'
 
-export const ART_BLOCKS_PAYMENT_TOKENS = ['ETH', 'WETH', 'USDC', 'DAI', 'ABST']
+export const ART_BLOCKS_PAYMENT_TOKENS = ['ETH', 'WETH', 'USDC', 'DAI', 'ABST', 'RARI']
 
 export function addressToPaymentToken(address: string) {
   switch (address) {
@@ -25,8 +26,11 @@ export function addressToPaymentToken(address: string) {
     case ABST_ADDR:
       return 'ABST'
 
+    case RARI_ADDR:
+      return 'RARI'
+
     default:
-      console.error(`UNKNOW PAYMENT TOKEN ${address}, ABANDON !`)
+      console.error(`UNKNOWN PAYMENT TOKEN ${address}, ABANDON!`)
       process.exit(-1)
   }
 }
@@ -48,8 +52,11 @@ export function amountHumanReadable(crypto: string, amount: BigNumber): string {
     case 'ABST':
       return amount.div(10_000).toNumber().toFixed(3)
 
+    case 'RARI':
+      return parseFloat(ethers.utils.formatEther(amount)).toFixed(5)
+
     default:
-      console.error(`UNKNOW CRYPTO ${crypto}, ABANDON !`)
+      console.error(`UNKNOWN CRYPTO ${crypto}, ABANDON!`)
       process.exit(-1)
   }
 }
