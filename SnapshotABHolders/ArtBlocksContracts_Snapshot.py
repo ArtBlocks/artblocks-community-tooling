@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 ########################################################################################
-## This script provides an easy way to aggregate the token holders of Art Blocks
-## projects and a list of the projects for which they each own tokens.
+## This script provides an easy way to take a snapshot of the token holders of Art Blocks
+## hosted projects (typically used for an allowlist). Hosted projects include "Collaborations"
+## although these can be removed by subtituting the AB_CORE_CONTRACT_ADDRESSES query.
 ##
 ## In this current example, all projects are being queried. However, projectIDFilter
 ## can be changed to query only project "0", Chromie Squiggles [1] by using the 
@@ -48,42 +49,35 @@ from requests.exceptions import HTTPError
 import csv
 import time
 
-RESULTS_CSV = 'ArtBlocksTokenHolders.csv'
-# optionally export a CSV containing only a list of unique owners
-OWNERS_ONLY_CSV = 'ArtBlocksTokenHolders_OwnersOnly.csv'  # or None
+RESULTS_CSV = 'ArtBlocksContracts_Snapshot.csv'
 SUBGRAPH_ENDPOINT = 'https://api.thegraph.com/subgraphs/name/artblocks/art-blocks'
-SUBGRAPH_QUERY= """
+
+AB_CORE_CONTRACT_ADDRESSES = [
+  "0x059edd72cd353df5106d2b9cc5ab83a52287ac3a", #GenArt721CoreV0
+  "0x99a9b7c1116f9ceeb1652de04d5969cce509b069", #GenArt721CoreV3
+  "0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270", #GenArt721CoreV1
+  ]
+AB_CORE_AND_COLLABORATOR_CONTRACT_ADDRESSES = [
+  "\"0x059edd72cd353df5106d2b9cc5ab83a52287ac3a\"", #GenArt721CoreV0
+  "\"0x99a9b7c1116f9ceeb1652de04d5969cce509b069\"", #GenArt721CoreV3
+  "\"0xa7d8d9ef8d8ce8992df33d8b8cf4aebabd5bd270\"", #GenArt721CoreV1
+  "\"0x64780ce53f6e966e18a22af13a2f97369580ec11\"" # GenArt721CoreV2_ArtBlocksXPace
+  ]
+
+SUBGRAPH_QUERY_AB_AND_COLLAB_PROJECTS= """
 {{
-  tokens(first: {entries}, where: {{ id_gt: "{lastID}" }}) {{
+  accounts(where: {{ tokens_: {{ contract_in: [{contracts}] }}, id_gt: "{lastID}"}}, orderBy: id, orderDirection: asc, first: 999) {{
     id
-    owner{{
-      id
-    }}
-    project {{
-      id
-    }}
-  }}
-}}
-"""
-SUBGRAPH_QUERY_PROJECT= """
-{{
-  tokens(first: {entries}, where: {{ id_gt: "{lastID}", project: "{projectID}" }}) {{
-    id
-    owner{{
-      id
-    }}
-    project {{
-      id
-    }}
   }}
 }}
 """
 
 def getTokens(session, entries, lastID, projectIDFilter=None):
     print(f'Retrieving next {entries} after item {lastID}.')
-    subgraphQuery = SUBGRAPH_QUERY.format(entries=entries, lastID=lastID) \
+
+    subgraphQuery = SUBGRAPH_QUERY_AB_AND_COLLAB_PROJECTS.format(entries=entries, lastID=lastID, contracts=str(",".join(AB_CORE_AND_COLLABORATOR_CONTRACT_ADDRESSES))) \
         if projectIDFilter == None \
-        else SUBGRAPH_QUERY_PROJECT.format(entries=entries, lastID=lastID, projectID=projectIDFilter)
+        else SUBGRAPH_QUERY_AB_AND_COLLAB_PROJECTS.format(entries=entries, lastID=lastID, projectID=projectIDFilter, contracts=str(",".join(AB_CORE_AND_COLLABORATOR_CONTRACT_ADDRESSES)))
     try:
         response = session.post(SUBGRAPH_ENDPOINT, json={'query': subgraphQuery})
         response.raise_for_status()
@@ -97,49 +91,30 @@ def getTokens(session, entries, lastID, projectIDFilter=None):
 
 def main():
     session = requests.Session()
-    ownerToProjectsMap = dict()
+    allAccounts = []
 
     entries = 1000
     lastID = ''
     projectIDFilter = None  # e.g. Project 0: '0x059edd72cd353df5106d2b9cc5ab83a52287ac3a-0'
     response = getTokens(session, entries, '', projectIDFilter)
+
     while response:
-        tokens = response["data"]["tokens"]
-        if not tokens:
+        accounts = response["data"]["accounts"]
+        if not accounts:
             break
 
-        for token in tokens:
-            owner = token["owner"]["id"]
-            projectID = token["project"]["id"]
-
-            projects = ownerToProjectsMap.get(owner)
-            if projects is None:
-                projects = set()
-            projects.add(projectID)
-            ownerToProjectsMap[owner] = projects
+        for account in accounts:
+            allAccounts.append(account["id"])
 
         time.sleep(1)
-        lastID = tokens[-1]["id"]
+        lastID = accounts[-1]["id"]
         response = getTokens(session, entries, lastID, projectIDFilter)
 
     with open(RESULTS_CSV, 'w') as f:
-        fieldnames = ['Owner', 'Projects', 'Total Projects Count']
-        writer = csv.DictWriter(f, quoting=csv.QUOTE_ALL, fieldnames=fieldnames)
-        writer.writeheader()
+        writer = csv.writer(f)
 
-        for owner, projects in ownerToProjectsMap.items():
-            writer.writerow({
-                'Owner': owner,
-                'Projects': sorted(projects),
-                'Total Projects Count': len(projects)
-            })
-    if OWNERS_ONLY_CSV:
-        import pandas as pd
-        data = pd.read_csv(RESULTS_CSV)
-        data.sort_values("Owner", axis=0, ascending=True,
-                 inplace=True, na_position='first')
-        dataToWrite = data["Owner"]
-        dataToWrite.to_csv(OWNERS_ONLY_CSV, index=False)
+        for account in allAccounts:
+            writer.writerow([account])
 
 if __name__ == "__main__":
     main()
