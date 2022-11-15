@@ -21,6 +21,6 @@ details.
   "\"0x28f2d3805652fb5d359486dffb7d08320d403240\"", # GenArt721CoreV2_PBAB
   "\"0xa319c382a702682129fcbf55d514e61a16f97f9c\"",
   "\"0x010...""
-  ]```
-
+  ]
+```
 - To retrieve the most up-to-date list of partner contract addresses, please refer to Art Blocks' [smart contract repo](https://github.com/ArtBlocks/artblocks-contracts/tree/main/contracts/PBAB%2BCollabs) and find each Engine (formerly "PBAB") project’s respective `DEPLOYMENTS.md` file. You can also refer to the subgraph's [config file](https://github.com/ArtBlocks/artblocks-subgraph/blob/main/config/mainnet.json) for a running list of past deployments.
