@@ -1,4 +1,6 @@
 # Art Blocks Community Tooling
+[![GitPOAPs](https://public-api.gitpoap.io/v1/repo/ArtBlocks/artblocks-community-tooling/badge)](https://www.gitpoap.io/gh/ArtBlocks/artblocks-community-tooling)
+
 A collection of open source tools, built in collaboration with the Art Blocks community!
 
 > :warning: This is a community tool set with contributions from external community members. Please use caution and know that you should NEVER enter private keys, seed phrases, or any other sensitive information when using these tools.
