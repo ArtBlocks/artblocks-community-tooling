@@ -99,6 +99,7 @@ SUBGRAPH_QUERY_PROJECT= """
 
 def getTokens(session, entries, lastID, PROJECT_ID_FILTER=None):
     print(f'Retrieving next {entries} after item {lastID}.')
+    PROJECT_ID_FILTER = PROJECT_ID_FILTER.lower() if PROJECT_ID_FILTER != None else None
     subgraphQuery = SUBGRAPH_QUERY.format(entries=entries, lastID=lastID, contracts=str(",".join(CORE_CONTRACTS))) \
         if PROJECT_ID_FILTER == None \
         else SUBGRAPH_QUERY_PROJECT.format(entries=entries, lastID=lastID, contracts=str(",".join(CORE_CONTRACTS)), projectID=PROJECT_ID_FILTER)
